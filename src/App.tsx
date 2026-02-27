@@ -11,6 +11,7 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Onboarding from './pages/Onboarding';
+import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import BreathTests from './pages/BreathTests';
 import FoodHub from './pages/FoodHub';
@@ -31,12 +32,13 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />
-      <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
-      <Route path="/signup" element={user ? <Navigate to="/dashboard" replace /> : <Signup />} />
+      <Route path="/" element={user ? <Navigate to="/home" replace /> : <Landing />} />
+      <Route path="/login" element={user ? <Navigate to="/home" replace /> : <Login />} />
+      <Route path="/signup" element={user ? <Navigate to="/home" replace /> : <Signup />} />
       <Route path="/onboarding" element={user ? <Onboarding /> : <Navigate to="/login" replace />} />
       
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+        <Route path="/home" element={<Home />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/breath-tests" element={<BreathTests />} />
         <Route path="/food-hub" element={<FoodHub />} />

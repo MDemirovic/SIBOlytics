@@ -1,32 +1,5 @@
 // Simple MVP retrieval for NIH Knowledge Base
 
-const kbFiles = [
-  {
-    id: 'sibo_overview',
-    title: 'SIBO Overview',
-    url: 'https://www.niddk.nih.gov/health-information/digestive-diseases/small-intestinal-bacterial-overgrowth-sibo',
-    content: 'Small intestinal bacterial overgrowth (SIBO) is a condition in which there is an abnormal increase in the overall bacterial population in the small intestine. It is often characterized by symptoms such as bloating, abdominal pain, diarrhea, and malabsorption. SIBO can occur when the normal mechanisms that control bacterial populations in the small intestine, such as gastric acid secretion and intestinal motility (the migrating motor complex), are disrupted.'
-  },
-  {
-    id: 'breath_tests_overview',
-    title: 'Breath Tests Overview',
-    url: 'https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5418558/',
-    content: 'Breath testing is a non-invasive method used to aid in the diagnosis of SIBO. It measures the levels of hydrogen and methane gases produced by bacterial fermentation of a substrate (such as glucose or lactulose) in the gut. A rise in hydrogen of ≥20 ppm from baseline within 90 minutes is generally considered positive for hydrogen-predominant SIBO. A methane level of ≥10 ppm at any point during the test is considered positive for intestinal methanogen overgrowth (IMO).'
-  },
-  {
-    id: 'ibs_overlap',
-    title: 'IBS Overlap',
-    url: 'https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3093012/',
-    content: 'There is a significant overlap between Irritable Bowel Syndrome (IBS) and SIBO. Studies suggest that a substantial proportion of patients diagnosed with IBS may actually have underlying SIBO, particularly those with diarrhea-predominant IBS (IBS-D). Symptoms of both conditions are highly similar, including bloating, altered bowel habits, and abdominal discomfort.'
-  },
-  {
-    id: 'fodmap_and_diet',
-    title: 'FODMAP and Diet',
-    url: 'https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3966170/',
-    content: 'A low-FODMAP diet is often recommended to manage symptoms of SIBO and IBS. FODMAPs are fermentable oligosaccharides, disaccharides, monosaccharides, and polyols—short-chain carbohydrates that are poorly absorbed in the small intestine. When these carbohydrates reach the bacteria in the gut, they are rapidly fermented, producing gas and drawing water into the intestine, which can exacerbate symptoms like bloating and diarrhea.'
-  }
-];
-
 export interface RetrievedChunk {
   id: string;
   title: string;
@@ -35,19 +8,46 @@ export interface RetrievedChunk {
   score: number;
 }
 
+interface CachedDoc {
+  url: string;
+  title: string;
+  dateFetched: string;
+  chunks: string[];
+}
+
+// Load all cache files at build time using Vite's import.meta.glob
+const cacheModules = (import.meta as any).glob('../nih_kb/cache/*.json', { eager: true });
+
+// Build the internal list of chunks
+const kbChunks: Omit<RetrievedChunk, 'score'>[] = [];
+
+Object.entries(cacheModules).forEach(([path, module]) => {
+  const doc = module as CachedDoc;
+  if (doc && doc.chunks && Array.isArray(doc.chunks)) {
+    doc.chunks.forEach((chunkText, index) => {
+      kbChunks.push({
+        id: `${doc.url}-chunk-${index}`,
+        title: doc.title,
+        url: doc.url,
+        content: chunkText
+      });
+    });
+  }
+});
+
 export function retrieveNIHContext(query: string): RetrievedChunk[] {
   const terms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
-  if (terms.length === 0) return [];
+  if (terms.length === 0 || kbChunks.length === 0) return [];
 
-  const scored = kbFiles.map(file => {
+  const scored = kbChunks.map(chunk => {
     let score = 0;
-    const text = (file.title + ' ' + file.content).toLowerCase();
+    const text = (chunk.title + ' ' + chunk.content).toLowerCase();
     terms.forEach(term => {
       if (text.includes(term)) {
         score += 1;
       }
     });
-    return { ...file, score };
+    return { ...chunk, score };
   });
 
   return scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score).slice(0, 2);

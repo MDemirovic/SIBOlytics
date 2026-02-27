@@ -12,7 +12,7 @@ export default function Login() {
     e.preventDefault();
     if (email) {
       login(email);
-      navigate('/dashboard');
+      navigate('/home');
     }
   };
 

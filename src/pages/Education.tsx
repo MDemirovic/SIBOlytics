@@ -12,11 +12,15 @@ export default function Education() {
 
   const scrollToSection = (id: string) => {
     setExpandedSection(id);
-    const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
     setShowMobileToc(false);
+    
+    // Wait for the state update and DOM expansion to complete before scrolling
+    setTimeout(() => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   };
 
   return (
@@ -44,7 +48,7 @@ export default function Education() {
         </button>
 
         {/* Table of Contents (Left Sidebar) */}
-        <div className={`lg:w-1/3 shrink-0 lg:sticky lg:top-6 ${showMobileToc ? 'block' : 'hidden lg:block'}`}>
+        <div className={`lg:w-1/3 shrink-0 lg:sticky lg:top-32 ${showMobileToc ? 'block' : 'hidden lg:block'}`}>
           <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm">
             <h3 className="text-sm font-medium text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-blue-400" />
@@ -77,7 +81,7 @@ export default function Education() {
               <div 
                 key={section.id} 
                 id={section.id}
-                className={`bg-slate-900/40 border rounded-2xl overflow-hidden transition-all duration-200 scroll-mt-6 ${
+                className={`bg-slate-900/40 border rounded-2xl overflow-hidden transition-all duration-200 scroll-mt-32 ${
                   isExpanded ? 'border-blue-500/30 shadow-lg shadow-blue-900/10' : 'border-slate-800 hover:border-slate-700'
                 }`}
               >

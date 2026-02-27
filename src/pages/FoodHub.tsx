@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, AlertCircle, CheckCircle2, AlertTriangle, Plus, Trash2 } from 'lucide-react';
-import { foods, FoodItem } from '../data/foods_from_file';
+import { foods, FoodItem } from '../data/foods_from_pdf';
 import { useAuth } from '../context/AuthContext';
 
 interface LoggedFood {
@@ -16,6 +16,10 @@ export default function FoodHub() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'database' | 'log'>('database');
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterLow, setFilterLow] = useState(true);
+  const [filterCaution, setFilterCaution] = useState(true);
+  const [filterHigh, setFilterHigh] = useState(true);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   
   // Personal Log State
   const [loggedFoods, setLoggedFoods] = useState<LoggedFood[]>([]);
@@ -56,9 +60,19 @@ export default function FoodHub() {
     }
   };
 
-  const filteredDatabase = foods.filter(food => 
-    food.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredDatabase = foods.filter(food => {
+    const matchesSearch = food.name.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    let matchesFilter = false;
+    if (food.fodmapLevel === 'low' && filterLow) matchesFilter = true;
+    if (food.fodmapLevel === 'caution' && filterCaution) matchesFilter = true;
+    if (food.fodmapLevel === 'high' && filterHigh) matchesFilter = true;
+    
+    // If all filters are off, show nothing (or show all? Usually show nothing if they unchecked all)
+    if (!filterLow && !filterCaution && !filterHigh) return false;
+
+    return matchesSearch && matchesFilter;
+  });
 
   const filteredLog = loggedFoods.filter(food => 
     food.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -110,13 +124,10 @@ export default function FoodHub() {
       <header>
         <h1 className="text-3xl font-semibold tracking-tight text-white mb-2">Food Hub</h1>
         <p className="text-slate-400 max-w-3xl">
-          A "low FODMAP" diet temporarily restricts certain fermentable carbs to help identify symptom triggers. 
+          A "low FODMAP" diet temporarily restricts certain fermentable carbs to help identify symptom triggers and manage symptoms. 
           Use this database to check foods during your elimination phase. 
         </p>
-        <div className="mt-3 flex items-start gap-2 text-xs text-amber-400 bg-amber-500/10 p-3 rounded-lg border border-amber-500/20 max-w-3xl">
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-          <p>Educational; individual tolerance varies; consult a dietitian/clinician.</p>
-        </div>
+       
       </header>
 
       {/* Tabs & Search */}
@@ -150,53 +161,92 @@ export default function FoodHub() {
 
       {/* Content */}
       {activeTab === 'database' ? (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filteredDatabase.map(food => {
-              const badge = getBadgeConfig(food.fodmapLevel);
-              return (
-                <div key={food.id} className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm hover:bg-slate-900/60 transition-colors flex flex-col">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="text-lg font-medium text-white">{food.name}</h3>
-                      <p className="text-xs text-slate-500">{food.category}</p>
-                    </div>
-                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium ${badge.bg} ${badge.color} ${badge.border}`}>
-                      {badge.icon}
-                      {badge.label}
-                    </div>
-                  </div>
-                  
-                  <div className="mt-auto space-y-2">
-                    {food.fodmapLevel === 'low' && (
-                      <div className="text-sm text-emerald-400 font-medium">
-                        {food.limitText ? `Limit to: ${food.limitText}` : 'Low FODMAP (limit not specified)'}
-                      </div>
-                    )}
-                    
-                    {food.fodmapLevel === 'caution' && (
-                      <div className="text-sm text-amber-400 font-medium">
-                        {food.limitText ? `Limit to: ${food.limitText}` : 'Portion-dependent (limit not specified)'}
-                      </div>
-                    )}
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          {/* Mobile Filter Toggle */}
+          <button 
+            className="lg:hidden w-full bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-center gap-2 text-white font-medium"
+            onClick={() => setShowMobileFilters(!showMobileFilters)}
+          >
+            Filters
+          </button>
 
-                    {food.note && (
-                      <div className="mt-3 pt-3 border-t border-slate-800/50 text-xs text-slate-400 leading-relaxed">
-                        {food.note}
-                      </div>
-                    )}
+          {/* Filters Sidebar */}
+          <div className={`lg:w-64 shrink-0 lg:sticky lg:top-32 ${showMobileFilters ? 'block' : 'hidden lg:block'}`}>
+            <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm">
+              <h3 className="text-sm font-medium text-slate-300 uppercase tracking-wider mb-4">
+                FODMAP Level
+              </h3>
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${filterLow ? 'bg-emerald-500 border-emerald-500' : 'border-slate-600 group-hover:border-slate-500'}`}>
+                    {filterLow && <CheckCircle2 className="w-3.5 h-3.5 text-slate-950" />}
                   </div>
-                </div>
-              );
-            })}
+                  <input type="checkbox" className="hidden" checked={filterLow} onChange={() => setFilterLow(!filterLow)} />
+                  <span className="text-sm text-slate-300">Low (safe)</span>
+                </label>
+                
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${filterCaution ? 'bg-amber-500 border-amber-500' : 'border-slate-600 group-hover:border-slate-500'}`}>
+                    {filterCaution && <CheckCircle2 className="w-3.5 h-3.5 text-slate-950" />}
+                  </div>
+                  <input type="checkbox" className="hidden" checked={filterCaution} onChange={() => setFilterCaution(!filterCaution)} />
+                  <span className="text-sm text-slate-300">Caution / Portion</span>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${filterHigh ? 'bg-red-500 border-red-500' : 'border-slate-600 group-hover:border-slate-500'}`}>
+                    {filterHigh && <CheckCircle2 className="w-3.5 h-3.5 text-slate-950" />}
+                  </div>
+                  <input type="checkbox" className="hidden" checked={filterHigh} onChange={() => setFilterHigh(!filterHigh)} />
+                  <span className="text-sm text-slate-300">High</span>
+                </label>
+              </div>
+            </div>
           </div>
 
-          {filteredDatabase.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-slate-400">No foods found matching "{searchQuery}".</p>
+          {/* Grid */}
+          <div className="flex-1 w-full">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {filteredDatabase.map(food => {
+                const badge = getBadgeConfig(food.fodmapLevel);
+                return (
+                  <div key={food.id} className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm hover:bg-slate-900/60 transition-colors flex flex-col">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="text-lg font-medium text-white">{food.name}</h3>
+                        <p className="text-xs text-slate-500">{food.category}</p>
+                      </div>
+                      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium ${badge.bg} ${badge.color} ${badge.border}`}>
+                        {badge.icon}
+                        {badge.label}
+                      </div>
+                    </div>
+                    
+                    <div className="mt-auto space-y-2">
+                      {food.limitText && (
+                        <div className={`text-sm font-medium ${food.fodmapLevel === 'low' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                          Limit to: {food.limitText}
+                        </div>
+                      )}
+
+                      {food.note && (
+                        <div className="mt-3 pt-3 border-t border-slate-800/50 text-xs text-slate-400 leading-relaxed">
+                          {food.note}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          )}
-        </>
+
+            {filteredDatabase.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-slate-400">No foods found matching your filters.</p>
+              </div>
+            )}
+          </div>
+        </div>
       ) : (
         <>
           <div className="flex justify-end mb-4">

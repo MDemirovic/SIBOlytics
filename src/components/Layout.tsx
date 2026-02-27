@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Activity, 
   FileText, 
-  Home, 
+  Table, 
   Utensils, 
   BookOpen, 
   Settings, 
@@ -12,7 +12,8 @@ import {
   LogOut,
   User as UserIcon,
   Heart,
-  Bot
+  Bot,
+  Home
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -62,6 +63,8 @@ export default function Layout() {
 
   const getHeaderContent = () => {
     switch (location.pathname) {
+      case '/home':
+        return { title: 'Home' };
       case '/dashboard':
         return { title: `Good morning, ${user?.name || 'Guest'}`, subtitle: 'Here is your daily digestive overview.' };
       case '/breath-tests':
@@ -95,7 +98,8 @@ export default function Layout() {
         </div>
         
         <nav className="flex-1 px-4 py-4 space-y-1">
-          <NavItem icon={<Home />} label="Dashboard" to="/dashboard" />
+          <NavItem icon={<Home />} label="Home" to="/home" />
+          <NavItem icon={<Table />} label="Dashboard" to="/dashboard" />
           <NavItem icon={<Activity />} label="Breath Tests" to="/breath-tests" />
           <NavItem icon={<Utensils />} label="Food Hub" to="/food-hub" />
           <NavItem icon={<BookOpen />} label="Education" to="/education" />

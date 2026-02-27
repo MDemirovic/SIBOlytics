@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "ingest:nih": "tsx scripts/ingest_nih_kb.ts"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -34,7 +35,7 @@
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/lunr": "^2.3.7",
-    "@types/node": "^22.19.12",
+    "@types/node": "^22.14.0",
     "@types/papaparse": "^5.5.2",
     "@types/pdfjs-dist": "^2.10.377",
     "autoprefixer": "^10.4.21",

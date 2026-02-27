@@ -20,7 +20,7 @@ export default function Onboarding() {
       setStep(step + 1);
     } else {
       completeOnboarding(formData);
-      navigate('/dashboard');
+      navigate('/home');
     }
   };
 
