@@ -9,7 +9,7 @@ export default function Home() {
   const firstName = user?.name?.split(' ')[0] || '';
 
   return (
-    <div className="space-y-8 max-w-4xl">
+    <div className="space-y-8 w-full">
       {/* Hero Card */}
       <section className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40 p-8 md:p-10">
         {/* Background Gradient Glow */}

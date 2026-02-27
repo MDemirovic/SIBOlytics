@@ -126,7 +126,7 @@ export default function BreathTests() {
               
               {/* Interpretation Card */}
               <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                <div className="bg-gradient-to-br from-blue-900/20 to-slate-900/40 border border-blue-900/30 rounded-2xl p-6 backdrop-blur-sm h-full">
+                <div className="bg-linear-to-br from-blue-900/20 to-slate-900/40 border border-blue-900/30 rounded-2xl p-6 backdrop-blur-sm h-full">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
                       <Activity className="w-4 h-4 text-blue-400" />
