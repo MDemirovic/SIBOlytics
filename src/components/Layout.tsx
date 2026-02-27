@@ -13,7 +13,9 @@ import {
   User as UserIcon,
   Heart,
   Bot,
-  Home
+  Home,
+  Menu,
+  X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -44,6 +46,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -55,6 +58,10 @@ export default function Layout() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    setIsMobileSidebarOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = () => {
     logout();
@@ -87,9 +94,31 @@ export default function Layout() {
   const headerContent = getHeaderContent();
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 font-sans flex overflow-hidden">
+    <div className="min-h-screen md:h-screen bg-slate-950 text-slate-50 font-sans flex flex-col md:flex-row overflow-x-hidden md:overflow-hidden">
+      {isMobileSidebarOpen && (
+        <button
+          className="md:hidden fixed inset-0 z-30 bg-slate-950/60"
+          onClick={() => setIsMobileSidebarOpen(false)}
+          aria-label="Close sidebar overlay"
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 bg-slate-900/50 backdrop-blur-xl border-r border-slate-800 flex flex-col hidden md:flex">
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 w-72 max-w-[85vw] bg-slate-900/95 backdrop-blur-xl border-r border-slate-800 flex flex-col overflow-y-auto transform transition-transform duration-200 md:static md:z-auto md:w-64 md:max-w-none md:bg-slate-900/50 md:border-b-0 md:translate-x-0 ${
+          isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="p-4 md:hidden flex justify-end">
+          <button
+            onClick={() => setIsMobileSidebarOpen(false)}
+            className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors"
+            aria-label="Close sidebar"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
         <div className="p-6 flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
             <Wind className="w-5 h-5 text-white" />
@@ -125,12 +154,21 @@ export default function Layout() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-screen overflow-y-auto relative">
+      <main className="flex-1 flex flex-col h-auto md:h-screen overflow-visible md:overflow-y-auto relative">
         {/* Top Header */}
-        <header className="sticky top-0 z-10 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/50 px-8 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">{headerContent.title}</h1>
-            {headerContent.subtitle && <p className="text-sm text-slate-400 mt-1">{headerContent.subtitle}</p>}
+        <header className="sticky top-0 z-10 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/50 px-4 md:px-8 py-4 flex items-center justify-between">
+          <div className="flex items-start gap-3">
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="md:hidden mt-0.5 p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors"
+              aria-label="Open sidebar"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div>
+              <h1 className="text-2xl font-semibold">{headerContent.title}</h1>
+              {headerContent.subtitle && <p className="text-sm text-slate-400 mt-1">{headerContent.subtitle}</p>}
+            </div>
           </div>
           
           <div className="flex items-center gap-4 relative" ref={dropdownRef}>
