@@ -60,9 +60,10 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <Router>
-        <AppRoutes />
-      </Router>
+     <Router basename={import.meta.env.BASE_URL}>
+    <AppRoutes />
+  </Router>
+
     </AuthProvider>
   );
 }
