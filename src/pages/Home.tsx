@@ -162,7 +162,7 @@ export default function Home() {
             <ul className="space-y-4">
               {[
                 'Start with a breath test or your symptoms baseline.',
-                'Use Food Hub filters to avoid overwhelm.',
+                'Use Food Hub to build an safe food list and manage symptoms',
                 'Bring your tracked data to your clinician.'
               ].map((tip, i) => (
                 <li key={i} className="flex items-start gap-3 text-sm text-slate-400">

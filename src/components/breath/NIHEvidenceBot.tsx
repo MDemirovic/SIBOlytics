@@ -151,6 +151,7 @@ export default function NIHEvidenceBot() {
           <button 
             type="submit"
             disabled={!input.trim()}
+            title="Send message"
             className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-lg flex items-center justify-center transition-colors"
           >
             <Send className="w-4 h-4" />
