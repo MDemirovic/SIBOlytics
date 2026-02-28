@@ -10,6 +10,9 @@ import Layout from './components/Layout';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import VerifyEmail from './pages/VerifyEmail';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Onboarding from './pages/Onboarding';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
@@ -35,6 +38,9 @@ function AppRoutes() {
       <Route path="/" element={user ? <Navigate to="/home" replace /> : <Landing />} />
       <Route path="/login" element={user ? <Navigate to="/home" replace /> : <Login />} />
       <Route path="/signup" element={user ? <Navigate to="/home" replace /> : <Signup />} />
+      <Route path="/verify-email" element={user ? <Navigate to="/home" replace /> : <VerifyEmail />} />
+      <Route path="/forgot-password" element={user ? <Navigate to="/home" replace /> : <ForgotPassword />} />
+      <Route path="/reset-password" element={user ? <Navigate to="/home" replace /> : <ResetPassword />} />
       <Route path="/onboarding" element={user ? <Onboarding /> : <Navigate to="/login" replace />} />
       
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>

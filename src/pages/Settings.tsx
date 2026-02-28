@@ -4,9 +4,10 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function Settings() {
-  const { user, logout } = useAuth();
+  const { user, logout, deleteAccount } = useAuth();
   const navigate = useNavigate();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [error, setError] = useState('');
 
   const handleExportData = () => {
     if (!user) return;
@@ -31,24 +32,30 @@ export default function Settings() {
 
   const handleClearData = () => {
     if (!user) return;
-    
-    // Remove user-specific data
-    localStorage.removeItem(`sibolytics_onboarding_${user.id}`);
-    localStorage.removeItem(`sibolytics_breathtests_${user.id}`);
-    
-    // Remove from users list
-    const users = JSON.parse(localStorage.getItem('sibolytics_users') || '{}');
-    delete users[user.email];
-    localStorage.setItem('sibolytics_users', JSON.stringify(users));
-    
-    // Logout
-    logout();
-    navigate('/');
+
+    const run = async () => {
+      setError('');
+      const result = await deleteAccount();
+      if (!result.success) {
+        setError(result.error || 'Could not delete account.');
+        return;
+      }
+
+      localStorage.removeItem(`sibolytics_onboarding_${user.id}`);
+      localStorage.removeItem(`sibolytics_breathtests_${user.id}`);
+      localStorage.removeItem(`sibolytics_foodlog_${user.id}`);
+      navigate('/');
+    };
+
+    run();
   };
 
   const handleLogout = () => {
-    logout();
-    navigate('/');
+    const run = async () => {
+      await logout();
+      navigate('/');
+    };
+    run();
   };
 
   return (
@@ -57,6 +64,12 @@ export default function Settings() {
         <h1 className="text-3xl font-semibold tracking-tight text-white mb-2">Settings</h1>
         <p className="text-slate-400">Manage your profile, data, and privacy preferences.</p>
       </header>
+
+      {error && (
+        <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
+          {error}
+        </div>
+      )}
 
       {/* Profile Section */}
       <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">

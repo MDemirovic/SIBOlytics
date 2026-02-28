@@ -7,6 +7,8 @@ export default function Onboarding() {
   const { user, completeOnboarding } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [formData, setFormData] = useState({
     primarySymptom: '',
@@ -15,11 +17,18 @@ export default function Onboarding() {
     suspectedTriggers: ''
   });
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step < 2) {
       setStep(step + 1);
     } else {
-      completeOnboarding(formData);
+      setError('');
+      setIsSubmitting(true);
+      const result = await completeOnboarding(formData);
+      setIsSubmitting(false);
+      if (!result.success) {
+        setError(result.error || 'Could not complete onboarding.');
+        return;
+      }
       navigate('/home');
     }
   };
@@ -129,13 +138,19 @@ export default function Onboarding() {
           </div>
         )}
 
+        {error && (
+          <div className="mt-4 text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
+            {error}
+          </div>
+        )}
+
         <div className="mt-8 flex justify-end">
           <button 
             onClick={handleNext}
-            disabled={step === 1 && (!formData.primarySymptom || !formData.stoolPattern)}
+            disabled={isSubmitting || (step === 1 && (!formData.primarySymptom || !formData.stoolPattern))}
             className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-xl font-medium transition-colors flex items-center gap-2"
           >
-            {step === 1 ? 'Next Step' : 'Go to Dashboard'}
+            {step === 1 ? 'Next Step' : (isSubmitting ? 'Saving...' : 'Go to Dashboard')}
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>

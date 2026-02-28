@@ -6,15 +6,27 @@ import { useAuth } from '../context/AuthContext';
 export default function Signup() {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { signup } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email && name) {
-      signup(email, name);
-      navigate('/onboarding');
+    if (!email || !name || !password) return;
+
+    setError('');
+    setIsSubmitting(true);
+    const result = await signup(email, name, password);
+    setIsSubmitting(false);
+
+    if (!result.success) {
+      setError(result.error || 'Could not create account.');
+      return;
     }
+
+    navigate(`/verify-email?email=${encodeURIComponent(email)}`);
   };
 
   return (
@@ -31,6 +43,12 @@ export default function Signup() {
         <p className="text-sm text-slate-400 mb-8 text-center">Start your journey to better gut health</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
+              {error}
+            </div>
+          )}
+
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-slate-300 mb-1.5">First Name</label>
             <input 
@@ -60,13 +78,20 @@ export default function Signup() {
             <input 
               type="password" 
               id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-              placeholder="••••••••"
+              required
+              placeholder="Password (min 8 characters)"
             />
           </div>
 
-          <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-medium transition-colors mt-6">
-            Create Account
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-medium transition-colors mt-6"
+          >
+            {isSubmitting ? 'Creating Account...' : 'Create Account'}
           </button>
         </form>
 

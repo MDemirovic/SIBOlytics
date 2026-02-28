@@ -5,79 +5,270 @@ export interface User {
   email: string;
   name: string;
   hasCompletedOnboarding: boolean;
+  emailVerified: boolean;
+}
+
+interface AuthResult {
+  success: boolean;
+  error?: string;
+  code?: string;
+  message?: string;
+  requiresEmailVerification?: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string) => void;
-  signup: (email: string, name: string) => void;
-  logout: () => void;
-  completeOnboarding: (data: any) => void;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<AuthResult>;
+  signup: (email: string, name: string, password: string) => Promise<AuthResult>;
+  logout: () => Promise<void>;
+  completeOnboarding: (data: any) => Promise<AuthResult>;
+  deleteAccount: () => Promise<AuthResult>;
+  resendVerification: (email: string) => Promise<AuthResult>;
+  verifyEmailToken: (token: string) => Promise<AuthResult>;
+  requestPasswordReset: (email: string) => Promise<AuthResult>;
+  resetPassword: (token: string, password: string) => Promise<AuthResult>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+async function parseResponse<T>(response: Response): Promise<T | null> {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('sibolytics_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
+    const loadCurrentUser = async () => {
+      try {
+        const response = await fetch('/api/auth/me', {
+          credentials: 'include',
+        });
+        const data = await parseResponse<{ user: User | null }>(response);
+        if (response.ok) {
+          setUser(data?.user ?? null);
+        } else {
+          setUser(null);
+        }
+      } catch {
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCurrentUser();
   }, []);
 
-  const login = (email: string) => {
-    const users = JSON.parse(localStorage.getItem('sibolytics_users') || '{}');
-    if (users[email]) {
-      setUser(users[email]);
-      localStorage.setItem('sibolytics_user', JSON.stringify(users[email]));
-    } else {
-      // For MVP, auto-signup if not found
-      signup(email, email.split('@')[0]);
+  const login = async (email: string, password: string): Promise<AuthResult> => {
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await parseResponse<{ user?: User; error?: string; code?: string }>(response);
+      if (!response.ok) {
+        return { success: false, error: data?.error || 'Login failed.', code: data?.code };
+      }
+      setUser(data?.user ?? null);
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Cannot connect to auth server.' };
     }
   };
 
-  const signup = (email: string, name: string) => {
-    const newUser: User = {
-      id: Date.now().toString(),
-      email,
-      name,
-      hasCompletedOnboarding: false,
-    };
-    const users = JSON.parse(localStorage.getItem('sibolytics_users') || '{}');
-    users[email] = newUser;
-    localStorage.setItem('sibolytics_users', JSON.stringify(users));
-    setUser(newUser);
-    localStorage.setItem('sibolytics_user', JSON.stringify(newUser));
+  const signup = async (email: string, name: string, password: string): Promise<AuthResult> => {
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ email, name, password }),
+      });
+      const data = await parseResponse<{ user?: User; error?: string; message?: string; requiresEmailVerification?: boolean }>(response);
+      if (!response.ok) {
+        return { success: false, error: data?.error || 'Signup failed.' };
+      }
+      setUser(null);
+      return {
+        success: true,
+        message: data?.message,
+        requiresEmailVerification: Boolean(data?.requiresEmailVerification),
+      };
+    } catch {
+      return { success: false, error: 'Cannot connect to auth server.' };
+    }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {
+      // Ignore network errors and clear local user state anyway.
+    }
     setUser(null);
-    localStorage.removeItem('sibolytics_user');
   };
 
-  const completeOnboarding = (data: any) => {
-    if (user) {
-      const updatedUser = { ...user, hasCompletedOnboarding: true };
-      setUser(updatedUser);
-      localStorage.setItem('sibolytics_user', JSON.stringify(updatedUser));
-      
-      const users = JSON.parse(localStorage.getItem('sibolytics_users') || '{}');
-      users[user.email] = updatedUser;
-      localStorage.setItem('sibolytics_users', JSON.stringify(users));
-      
-      // Save onboarding data
+  const completeOnboarding = async (data: any): Promise<AuthResult> => {
+    if (!user) {
+      return { success: false, error: 'User not logged in.' };
+    }
+
+    try {
+      const response = await fetch('/api/auth/onboarding', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ data }),
+      });
+      const payload = await parseResponse<{ user?: User; error?: string }>(response);
+      if (!response.ok) {
+        return { success: false, error: payload?.error || 'Could not save onboarding.' };
+      }
+      if (payload?.user) {
+        setUser(payload.user);
+      }
       localStorage.setItem(`sibolytics_onboarding_${user.id}`, JSON.stringify(data));
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Cannot connect to auth server.' };
+    }
+  };
+
+  const deleteAccount = async (): Promise<AuthResult> => {
+    try {
+      const response = await fetch('/api/auth/account', {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const payload = await parseResponse<{ error?: string }>(response);
+        return { success: false, error: payload?.error || 'Could not delete account.' };
+      }
+      setUser(null);
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Cannot connect to auth server.' };
+    }
+  };
+
+  const resendVerification = async (email: string): Promise<AuthResult> => {
+    try {
+      const response = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ email }),
+      });
+      const payload = await parseResponse<{ error?: string; message?: string }>(response);
+      if (!response.ok) {
+        return { success: false, error: payload?.error || 'Could not resend verification email.' };
+      }
+      return { success: true, message: payload?.message || 'Verification email sent.' };
+    } catch {
+      return { success: false, error: 'Cannot connect to auth server.' };
+    }
+  };
+
+  const requestPasswordReset = async (email: string): Promise<AuthResult> => {
+    try {
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ email }),
+      });
+      const payload = await parseResponse<{ error?: string; message?: string }>(response);
+      if (!response.ok) {
+        return { success: false, error: payload?.error || 'Could not start password reset.' };
+      }
+      return { success: true, message: payload?.message || 'Reset email sent.' };
+    } catch {
+      return { success: false, error: 'Cannot connect to auth server.' };
+    }
+  };
+
+  const verifyEmailToken = async (token: string): Promise<AuthResult> => {
+    try {
+      const response = await fetch('/api/auth/verify-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ token }),
+      });
+      const payload = await parseResponse<{ error?: string; message?: string }>(response);
+      if (!response.ok) {
+        return { success: false, error: payload?.error || 'Could not verify email.' };
+      }
+      return { success: true, message: payload?.message || 'Email verified.' };
+    } catch {
+      return { success: false, error: 'Cannot connect to auth server.' };
+    }
+  };
+
+  const resetPassword = async (token: string, password: string): Promise<AuthResult> => {
+    try {
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ token, password }),
+      });
+      const payload = await parseResponse<{ error?: string; message?: string }>(response);
+      if (!response.ok) {
+        return { success: false, error: payload?.error || 'Could not reset password.' };
+      }
+      return { success: true, message: payload?.message || 'Password reset successful.' };
+    } catch {
+      return { success: false, error: 'Cannot connect to auth server.' };
     }
   };
 
   if (loading) return null;
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, completeOnboarding }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        signup,
+        logout,
+        completeOnboarding,
+        deleteAccount,
+        resendVerification,
+        verifyEmailToken,
+        requestPasswordReset,
+        resetPassword,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
