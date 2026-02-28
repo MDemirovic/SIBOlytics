@@ -1,7 +1,7 @@
 [
   {
-    "url": "https://www.niddk.nih.gov/health-information/digestive-diseases/small-intestinal-bacterial-overgrowth",
-    "title": "Small Intestinal Bacterial Overgrowth (SIBO)",
+    "url": "https://www.niddk.nih.gov/health-information/digestive-diseases/irritable-bowel-syndrome",
+    "title": "Irritable Bowel Syndrome (IBS) | NIDDK",
     "category": "Overview"
   },
   {
@@ -12,6 +12,11 @@
   {
     "url": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5347643/",
     "title": "Hydrogen and Methane-Based Breath Testing in Gastrointestinal Disorders",
+    "category": "Testing"
+  },
+  {
+    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10132719/",
+    "title": "Understanding Our Tests: Hydrogen-Methane Breath Testing to Diagnose Small Intestinal Bacterial Overgrowth",
     "category": "Testing"
   }
 ]
