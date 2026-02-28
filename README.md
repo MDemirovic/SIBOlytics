@@ -34,3 +34,31 @@ SIBOlytics is a web app for people tracking SIBO-related data: breath tests, foo
 ### 1) Install
 ```bash
 npm install
+```
+
+### 2) Run locally
+```bash
+npm run dev
+```
+
+## Production Setup (GitHub Pages + separate backend)
+
+When the frontend is hosted on GitHub Pages, `/api` does not exist there.  
+Set a real backend URL for the frontend build:
+
+```env
+VITE_API_BASE_URL=https://your-backend-domain.com
+```
+
+Backend env (on Render/Railway/Fly/etc):
+
+```env
+APP_URL=https://mdemirovic.github.io/SIBOlytics
+CORS_ORIGINS=https://mdemirovic.github.io
+CROSS_SITE_COOKIES=true
+```
+
+Notes:
+- `CROSS_SITE_COOKIES=true` is needed because frontend and backend are different domains.
+- Backend must run on HTTPS for cross-site secure cookies.
+- After changing frontend env vars, rebuild/redeploy frontend.

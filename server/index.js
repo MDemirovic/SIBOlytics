@@ -21,6 +21,7 @@ const LOGIN_MAX_ATTEMPTS = 5;
 const isProduction = process.env.NODE_ENV === 'production';
 const scryptAsync = promisify(crypto.scrypt);
 const loginAttempts = new Map();
+const crossSiteCookies = process.env.CROSS_SITE_COOKIES === 'true';
 
 // Load backend env vars from local files when available.
 dotenv.config({ path: path.join(ROOT_DIR, '.env.local') });
@@ -229,6 +230,19 @@ function buildAppBaseUrl(req) {
   return 'http://127.0.0.1:3000';
 }
 
+function buildAllowedOrigins() {
+  const defaults = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+  const fromEnv = String(process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const appUrl = String(process.env.APP_URL || '').trim();
+  const allOrigins = [...defaults, ...fromEnv, appUrl]
+    .filter(Boolean)
+    .map((origin) => origin.replace(/\/$/, ''));
+  return new Set(allOrigins);
+}
+
 function isLoginRateLimited(key) {
   const state = loginAttempts.get(key);
   if (!state) return { limited: false, retryAfterMs: 0 };
@@ -337,8 +351,8 @@ function createSession(res, userId) {
   statements.insertSession.run(sessionId, userId, expiresAt, now);
   res.cookie(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: 'lax',
+    secure: isProduction || crossSiteCookies,
+    sameSite: crossSiteCookies ? 'none' : 'lax',
     path: '/',
     expires: new Date(expiresAt),
   });
@@ -347,8 +361,8 @@ function createSession(res, userId) {
 function clearSessionCookie(res) {
   res.clearCookie(SESSION_COOKIE_NAME, {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: 'lax',
+    secure: isProduction || crossSiteCookies,
+    sameSite: crossSiteCookies ? 'none' : 'lax',
     path: '/',
   });
 }
@@ -382,14 +396,12 @@ function requireAuth(req, res, next) {
 const app = express();
 app.use(express.json({ limit: '1mb' }));
 
-const allowedOrigins = new Set([
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-]);
+const allowedOrigins = buildAllowedOrigins();
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin && allowedOrigins.has(origin)) {
+  const normalizedOrigin = origin ? String(origin).replace(/\/$/, '') : '';
+  if (normalizedOrigin && allowedOrigins.has(normalizedOrigin)) {
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Headers', 'Content-Type');

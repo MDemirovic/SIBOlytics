@@ -31,6 +31,11 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/$/, '');
+
+function apiUrl(path: string): string {
+  return apiBaseUrl ? `${apiBaseUrl}${path}` : path;
+}
 
 async function parseResponse<T>(response: Response): Promise<T | null> {
   const text = await response.text();
@@ -49,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadCurrentUser = async () => {
       try {
-        const response = await fetch('/api/auth/me', {
+        const response = await fetch(apiUrl('/api/auth/me'), {
           credentials: 'include',
         });
         const data = await parseResponse<{ user: User | null }>(response);
@@ -70,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string): Promise<AuthResult> => {
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(apiUrl('/api/auth/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -91,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signup = async (email: string, name: string, password: string): Promise<AuthResult> => {
     try {
-      const response = await fetch('/api/auth/signup', {
+      const response = await fetch(apiUrl('/api/auth/signup'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -116,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', {
+      await fetch(apiUrl('/api/auth/logout'), {
         method: 'POST',
         credentials: 'include',
       });
@@ -132,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const response = await fetch('/api/auth/onboarding', {
+      const response = await fetch(apiUrl('/api/auth/onboarding'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -156,7 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const deleteAccount = async (): Promise<AuthResult> => {
     try {
-      const response = await fetch('/api/auth/account', {
+      const response = await fetch(apiUrl('/api/auth/account'), {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -173,7 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const resendVerification = async (email: string): Promise<AuthResult> => {
     try {
-      const response = await fetch('/api/auth/resend-verification', {
+      const response = await fetch(apiUrl('/api/auth/resend-verification'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -193,7 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const requestPasswordReset = async (email: string): Promise<AuthResult> => {
     try {
-      const response = await fetch('/api/auth/forgot-password', {
+      const response = await fetch(apiUrl('/api/auth/forgot-password'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -213,7 +218,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const verifyEmailToken = async (token: string): Promise<AuthResult> => {
     try {
-      const response = await fetch('/api/auth/verify-email', {
+      const response = await fetch(apiUrl('/api/auth/verify-email'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -233,7 +238,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const resetPassword = async (token: string, password: string): Promise<AuthResult> => {
     try {
-      const response = await fetch('/api/auth/reset-password', {
+      const response = await fetch(apiUrl('/api/auth/reset-password'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
