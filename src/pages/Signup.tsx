@@ -26,7 +26,12 @@ export default function Signup() {
       return;
     }
 
-    navigate(`/verify-email?email=${encodeURIComponent(email)}`);
+    if (result.requiresEmailVerification) {
+      navigate(`/verify-email?email=${encodeURIComponent(email)}`);
+      return;
+    }
+
+    navigate('/login');
   };
 
   return (

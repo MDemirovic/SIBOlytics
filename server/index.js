@@ -27,6 +27,14 @@ const crossSiteCookies = process.env.CROSS_SITE_COOKIES === 'true';
 dotenv.config({ path: path.join(ROOT_DIR, '.env.local') });
 dotenv.config({ path: path.join(ROOT_DIR, '.env') });
 
+function isEmailVerificationRequired() {
+  if (process.env.EMAIL_VERIFICATION_REQUIRED === 'true') return true;
+  if (process.env.EMAIL_VERIFICATION_REQUIRED === 'false') return false;
+  return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL);
+}
+
+const emailVerificationRequired = isEmailVerificationRequired();
+
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const db = new Database(DB_PATH);
@@ -98,7 +106,7 @@ const statements = {
       created_at,
       updated_at
     )
-    VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?)
+    VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?)
   `),
   setEmailVerifyToken: db.prepare(`
     UPDATE users
@@ -452,14 +460,15 @@ app.post('/api/auth/signup', async (req, res) => {
 
     const now = Date.now();
     const passwordHash = await hashPassword(password);
-    const verificationToken = createVerificationToken();
-    const verificationTokenHash = hashToken(verificationToken);
-    const verificationExpiresAt = now + EMAIL_VERIFY_TTL_MS;
+    const verificationToken = emailVerificationRequired ? createVerificationToken() : null;
+    const verificationTokenHash = verificationToken ? hashToken(verificationToken) : null;
+    const verificationExpiresAt = verificationToken ? now + EMAIL_VERIFY_TTL_MS : null;
 
     const result = statements.insertUser.run(
       email,
       name,
       passwordHash,
+      emailVerificationRequired ? 0 : 1,
       verificationTokenHash,
       verificationExpiresAt,
       now,
@@ -468,18 +477,22 @@ app.post('/api/auth/signup', async (req, res) => {
     const userRow = statements.getUserById.get(result.lastInsertRowid);
     const user = mapUser(userRow);
 
-    const verifyUrl = `${buildAppBaseUrl(req)}/verify-email?token=${encodeURIComponent(verificationToken)}`;
-    await sendEmail({
-      to: email,
-      subject: 'Verify your SIBOlytics account',
-      text: `Verify your account by opening this link: ${verifyUrl}`,
-      html: `<p>Verify your account by clicking <a href="${verifyUrl}">this link</a>.</p>`,
-    });
+    if (verificationToken) {
+      const verifyUrl = `${buildAppBaseUrl(req)}/verify-email?token=${encodeURIComponent(verificationToken)}`;
+      await sendEmail({
+        to: email,
+        subject: 'Verify your SIBOlytics account',
+        text: `Verify your account by opening this link: ${verifyUrl}`,
+        html: `<p>Verify your account by clicking <a href="${verifyUrl}">this link</a>.</p>`,
+      });
+    }
 
     res.status(201).json({
       user,
-      requiresEmailVerification: true,
-      message: 'Account created. Check your email to verify your account.',
+      requiresEmailVerification: emailVerificationRequired,
+      message: emailVerificationRequired
+        ? 'Account created. Check your email to verify your account.'
+        : 'Account created. You can now log in.',
     });
   } catch (error) {
     console.error('Signup failed:', error);
@@ -489,6 +502,11 @@ app.post('/api/auth/signup', async (req, res) => {
 
 app.post('/api/auth/resend-verification', async (req, res) => {
   try {
+    if (!emailVerificationRequired) {
+      res.json({ message: 'Email verification is disabled for this environment.' });
+      return;
+    }
+
     const email = normalizeEmail(req.body?.email);
     if (!isValidEmail(email)) {
       res.status(400).json({ error: 'Enter a valid email address.' });
@@ -509,6 +527,11 @@ app.post('/api/auth/resend-verification', async (req, res) => {
 
 app.post('/api/auth/verify-email', (req, res) => {
   try {
+    if (!emailVerificationRequired) {
+      res.json({ message: 'Email verification is disabled for this environment.' });
+      return;
+    }
+
     const token = String(req.body?.token || '').trim();
     if (!token) {
       res.status(400).json({ error: 'Verification token is missing.' });
@@ -611,7 +634,7 @@ app.post('/api/auth/login', async (req, res) => {
       return;
     }
 
-    if (!row.email_verified) {
+    if (emailVerificationRequired && !row.email_verified) {
       res.status(403).json({
         error: 'Please verify your email before logging in.',
         code: 'EMAIL_NOT_VERIFIED',
