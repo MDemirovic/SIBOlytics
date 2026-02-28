@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Plus, AlertCircle } from 'lucide-react';
+import { Activity, Plus, AlertCircle, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { BreathTest } from '../types/breathTest';
 import BreathChart from '../components/breath/BreathChart';
@@ -11,6 +11,7 @@ export default function BreathTests() {
   const [tests, setTests] = useState<BreathTest[]>([]);
   const [selectedTestId, setSelectedTestId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -56,13 +57,18 @@ export default function BreathTests() {
   };
 
   const handleDeleteTest = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this test?')) {
-      const updatedTests = tests.filter(t => t.id !== id);
-      saveTests(updatedTests);
-      if (selectedTestId === id) {
-        setSelectedTestId(updatedTests.length > 0 ? updatedTests[0].id : null);
-      }
+    setDeleteCandidateId(id);
+  };
+
+  const confirmDeleteTest = () => {
+    if (!deleteCandidateId) return;
+
+    const updatedTests = tests.filter(t => t.id !== deleteCandidateId);
+    saveTests(updatedTests);
+    if (selectedTestId === deleteCandidateId) {
+      setSelectedTestId(updatedTests.length > 0 ? updatedTests[0].id : null);
     }
+    setDeleteCandidateId(null);
   };
 
   const getInterpretation = (test: BreathTest) => {
@@ -105,6 +111,7 @@ export default function BreathTests() {
 
   const selectedTest = tests.find(t => t.id === selectedTestId);
   const selectedInterpretation = selectedTest ? getInterpretation(selectedTest) : null;
+  const deleteCandidate = tests.find(t => t.id === deleteCandidateId);
 
   return (
     <div className="space-y-6">
@@ -218,6 +225,41 @@ export default function BreathTests() {
           onClose={() => setIsAdding(false)}
           onSave={handleSaveTest}
         />
+      )}
+
+      {deleteCandidate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-white">Delete this breath test?</h3>
+                <p className="text-sm text-slate-400 mt-2">
+                  This action cannot be undone. You are deleting the{' '}
+                  <span className="capitalize text-slate-200">{deleteCandidate.substrate}</span> test from{' '}
+                  <span className="text-slate-200">{new Date(deleteCandidate.createdAt).toLocaleDateString()}</span>.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteCandidateId(null)}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteTest}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition-colors cursor-pointer"
+              >
+                Delete Test
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
