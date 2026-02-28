@@ -1,46 +1,36 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# SIBOlytics
 
-# Run and deploy your AI Studio app
+SIBOlytics is a web app for people tracking SIBO-related data: breath tests, food tolerance, and educational insights in one place.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/d2de5e51-5227-4297-afe6-4a644f8673fd
+- Secure authentication backend (Express + SQLite)
+- Signup and login with hashed passwords
+- Email verification flow
+- Forgot/reset password flow
+- Login rate limiting protection
+- Breath test upload/manual entry and chart visualization
+- Educational interpretation for selected breath tests
+- Low FODMAP database browsing and filtering
+- Personal food log (symptom/trigger tracking)
 
-## Run Locally
+## Current Data Model
 
-**Prerequisites:**  Node.js
+- **Auth and account data**: stored in backend SQLite (`server/data/auth.sqlite`)
+- **Breath tests and food log**: currently stored in browser localStorage per user session/device
 
+> Note: breath test and food log data are not yet synced across devices.  
+> Planned next step is full backend storage for these modules.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the full app (frontend + auth API server):
-   `npm run dev`
+## Tech Stack
 
-## Auth Notes
+- Frontend: React, TypeScript, Vite, Tailwind, Recharts
+- Backend: Node.js, Express
+- Database: SQLite (`better-sqlite3`)
+- Email: Resend (optional, with dev fallback logs)
 
-- The app now uses a real auth backend with:
-  - SQLite user storage (`server/data/auth.sqlite`)
-  - password hashing via Node `crypto.scrypt`
-  - HTTP-only session cookies
-  - email verification and password reset token flow
-  - login rate limiting (5 attempts / 15 min per IP+email)
-- API server runs on `http://127.0.0.1:3001`
-- Vite proxies `/api/*` to the auth server in development
+## Getting Started
 
-### Email Delivery
-
-- For real email sending, set:
-  - `RESEND_API_KEY`
-  - `RESEND_FROM_EMAIL`
-- Without these vars, verification/reset links are logged to server console (`[email-dev] ...`).
-
-### Useful Scripts
-
-- `npm run dev`: starts frontend and auth server together
-- `npm run dev:client`: starts only Vite frontend
-- `npm run dev:server`: starts only auth API server
-- `npm run build`: builds frontend
-- `npm run start`: runs auth server (serves `dist` only in production mode)
+### 1) Install
+```bash
+npm install
