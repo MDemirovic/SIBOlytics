@@ -31,20 +31,40 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/$/, '');
+const AUTH_USER_KEY = 'sibolytics_auth_user';
+const AUTH_USERS_KEY = 'sibolytics_auth_users';
 
-function apiUrl(path: string): string {
-  return apiBaseUrl ? `${apiBaseUrl}${path}` : path;
+function loadUsers(): User[] {
+  const stored = localStorage.getItem(AUTH_USERS_KEY);
+  if (!stored) return [];
+  try {
+    return JSON.parse(stored) as User[];
+  } catch {
+    return [];
+  }
 }
 
-async function parseResponse<T>(response: Response): Promise<T | null> {
-  const text = await response.text();
-  if (!text) return null;
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    return null;
-  }
+function saveUsers(users: User[]) {
+  localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users));
+}
+
+function deriveNameFromEmail(email: string): string {
+  const prefix = email.split('@')[0] || 'User';
+  const cleaned = prefix.replace(/[._-]+/g, ' ').trim();
+  if (!cleaned) return 'User';
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+function createUser(email: string, name?: string): User {
+  const trimmedEmail = email.trim();
+  const displayName = name?.trim() || deriveNameFromEmail(trimmedEmail);
+  return {
+    id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    email: trimmedEmail,
+    name: displayName,
+    hasCompletedOnboarding: false,
+    emailVerified: true,
+  };
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -52,93 +72,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 2500);
-
-    const loadCurrentUser = async () => {
+    const stored = localStorage.getItem(AUTH_USER_KEY);
+    if (stored) {
       try {
-        const response = await fetch(apiUrl('/api/auth/me'), {
-          credentials: 'include',
-          signal: controller.signal,
-        });
-        const data = await parseResponse<{ user: User | null }>(response);
-        if (response.ok) {
-          setUser(data?.user ?? null);
-        } else {
-          setUser(null);
-        }
+        setUser(JSON.parse(stored) as User);
       } catch {
         setUser(null);
-      } finally {
-        window.clearTimeout(timeoutId);
-        setLoading(false);
       }
-    };
-
-    loadCurrentUser();
-
-    return () => {
-      window.clearTimeout(timeoutId);
-      controller.abort();
-    };
+    }
+    setLoading(false);
   }, []);
 
   const login = async (email: string, password: string): Promise<AuthResult> => {
-    try {
-      const response = await fetch(apiUrl('/api/auth/login'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await parseResponse<{ user?: User; error?: string; code?: string }>(response);
-      if (!response.ok) {
-        return { success: false, error: data?.error || 'Login failed.', code: data?.code };
-      }
-      setUser(data?.user ?? null);
-      return { success: true };
-    } catch {
-      return { success: false, error: 'Cannot connect to auth server.' };
+    const normalizedEmail = email.trim().toLowerCase();
+    const users = loadUsers();
+    let existing = users.find((entry) => entry.email.toLowerCase() === normalizedEmail);
+
+    if (!existing) {
+      existing = createUser(email);
+      users.unshift(existing);
+      saveUsers(users);
     }
+
+    setUser(existing);
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(existing));
+    return { success: true };
   };
 
   const signup = async (email: string, name: string, password: string): Promise<AuthResult> => {
-    try {
-      const response = await fetch(apiUrl('/api/auth/signup'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ email, name, password }),
-      });
-      const data = await parseResponse<{ user?: User; error?: string; message?: string; requiresEmailVerification?: boolean }>(response);
-      if (!response.ok) {
-        return { success: false, error: data?.error || 'Signup failed.' };
-      }
-      setUser(null);
-      return {
-        success: true,
-        message: data?.message,
-        requiresEmailVerification: Boolean(data?.requiresEmailVerification),
-      };
-    } catch {
-      return { success: false, error: 'Cannot connect to auth server.' };
+    const normalizedEmail = email.trim().toLowerCase();
+    const users = loadUsers();
+    const existingIndex = users.findIndex((entry) => entry.email.toLowerCase() === normalizedEmail);
+
+    if (existingIndex >= 0) {
+      const updated = { ...users[existingIndex], name: name.trim() || users[existingIndex].name };
+      users[existingIndex] = updated;
+      saveUsers(users);
+      return { success: true, requiresEmailVerification: false };
     }
+
+    const newUser = createUser(email, name);
+    saveUsers([newUser, ...users]);
+    return { success: true, requiresEmailVerification: false };
   };
 
   const logout = async () => {
-    try {
-      await fetch(apiUrl('/api/auth/logout'), {
-        method: 'POST',
-        credentials: 'include',
-      });
-    } catch {
-      // Ignore network errors and clear local user state anyway.
-    }
     setUser(null);
+    localStorage.removeItem(AUTH_USER_KEY);
   };
 
   const completeOnboarding = async (data: any): Promise<AuthResult> => {
@@ -146,124 +126,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false, error: 'User not logged in.' };
     }
 
-    try {
-      const response = await fetch(apiUrl('/api/auth/onboarding'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ data }),
-      });
-      const payload = await parseResponse<{ user?: User; error?: string }>(response);
-      if (!response.ok) {
-        return { success: false, error: payload?.error || 'Could not save onboarding.' };
-      }
-      if (payload?.user) {
-        setUser(payload.user);
-      }
-      localStorage.setItem(`sibolytics_onboarding_${user.id}`, JSON.stringify(data));
-      return { success: true };
-    } catch {
-      return { success: false, error: 'Cannot connect to auth server.' };
-    }
+    const users = loadUsers();
+    const updatedUser = { ...user, hasCompletedOnboarding: true };
+    const nextUsers = users.map((entry) => (entry.id === user.id ? updatedUser : entry));
+    saveUsers(nextUsers);
+    setUser(updatedUser);
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(updatedUser));
+    localStorage.setItem(`sibolytics_onboarding_${user.id}`, JSON.stringify(data));
+    return { success: true };
   };
 
   const deleteAccount = async (): Promise<AuthResult> => {
-    try {
-      const response = await fetch(apiUrl('/api/auth/account'), {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        const payload = await parseResponse<{ error?: string }>(response);
-        return { success: false, error: payload?.error || 'Could not delete account.' };
-      }
-      setUser(null);
-      return { success: true };
-    } catch {
-      return { success: false, error: 'Cannot connect to auth server.' };
-    }
+    if (!user) return { success: true };
+    const users = loadUsers().filter((entry) => entry.id !== user.id);
+    saveUsers(users);
+    setUser(null);
+    localStorage.removeItem(AUTH_USER_KEY);
+    return { success: true };
   };
 
   const resendVerification = async (email: string): Promise<AuthResult> => {
-    try {
-      const response = await fetch(apiUrl('/api/auth/resend-verification'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ email }),
-      });
-      const payload = await parseResponse<{ error?: string; message?: string }>(response);
-      if (!response.ok) {
-        return { success: false, error: payload?.error || 'Could not resend verification email.' };
-      }
-      return { success: true, message: payload?.message || 'Verification email sent.' };
-    } catch {
-      return { success: false, error: 'Cannot connect to auth server.' };
-    }
+    return { success: true, message: 'Verification email sent.' };
   };
 
   const requestPasswordReset = async (email: string): Promise<AuthResult> => {
-    try {
-      const response = await fetch(apiUrl('/api/auth/forgot-password'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ email }),
-      });
-      const payload = await parseResponse<{ error?: string; message?: string }>(response);
-      if (!response.ok) {
-        return { success: false, error: payload?.error || 'Could not start password reset.' };
-      }
-      return { success: true, message: payload?.message || 'Reset email sent.' };
-    } catch {
-      return { success: false, error: 'Cannot connect to auth server.' };
-    }
+    return { success: true, message: 'Reset email sent.' };
   };
 
   const verifyEmailToken = async (token: string): Promise<AuthResult> => {
-    try {
-      const response = await fetch(apiUrl('/api/auth/verify-email'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ token }),
-      });
-      const payload = await parseResponse<{ error?: string; message?: string }>(response);
-      if (!response.ok) {
-        return { success: false, error: payload?.error || 'Could not verify email.' };
-      }
-      return { success: true, message: payload?.message || 'Email verified.' };
-    } catch {
-      return { success: false, error: 'Cannot connect to auth server.' };
-    }
+    return { success: true, message: 'Email verified.' };
   };
 
   const resetPassword = async (token: string, password: string): Promise<AuthResult> => {
-    try {
-      const response = await fetch(apiUrl('/api/auth/reset-password'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ token, password }),
-      });
-      const payload = await parseResponse<{ error?: string; message?: string }>(response);
-      if (!response.ok) {
-        return { success: false, error: payload?.error || 'Could not reset password.' };
-      }
-      return { success: true, message: payload?.message || 'Password reset successful.' };
-    } catch {
-      return { success: false, error: 'Cannot connect to auth server.' };
-    }
+    return { success: true, message: 'Password reset successful.' };
   };
 
   return (

@@ -50,7 +50,7 @@ export function retrieveNIHContext(query: string): RetrievedChunk[] {
     return { ...chunk, score };
   });
 
-  return scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score).slice(0, 2);
+  return scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score).slice(0, 2); //vraca top 2 rezultata
 }
 
 export function generateNIHAnswer(query: string): { answer: string, citations: RetrievedChunk[] } {
