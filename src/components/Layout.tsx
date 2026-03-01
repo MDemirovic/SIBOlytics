@@ -19,10 +19,24 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-function NavItem({ icon, label, to }: { icon: React.ReactNode, label: string, to: string }) {
+const routePrefetchers: Record<string, () => void> = {
+  '/home': () => { void import('../pages/Home'); },
+  '/dashboard': () => { void import('../pages/Dashboard'); },
+  '/breath-tests': () => { void import('../pages/BreathTests'); },
+  '/food-hub': () => { void import('../pages/FoodHub'); },
+  '/education': () => { void import('../pages/Education'); },
+  '/nih-evidence': () => { void import('../pages/NIHEvidence'); },
+  '/sibo-success': () => { void import('../pages/SiboSuccess'); },
+  '/settings': () => { void import('../pages/Settings'); },
+  '/onboarding': () => { void import('../pages/Onboarding'); },
+};
+
+function NavItem({ icon, label, to, onPrefetch }: { icon: React.ReactNode, label: string, to: string, onPrefetch?: () => void }) {
   return (
     <NavLink 
       to={to}
+      onMouseEnter={onPrefetch}
+      onFocus={onPrefetch}
       className={({ isActive }) => `w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
         isActive 
           ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
@@ -127,13 +141,13 @@ export default function Layout() {
         </div>
         
         <nav className="flex-1 px-4 py-4 space-y-1">
-          <NavItem icon={<Home />} label="Home" to="/home" />
-          <NavItem icon={<Table />} label="Dashboard" to="/dashboard" />
-          <NavItem icon={<Activity />} label="Breath Tests" to="/breath-tests" />
-          <NavItem icon={<Utensils />} label="Food Hub" to="/food-hub" />
-          <NavItem icon={<BookOpen />} label="Education" to="/education" />
-          <NavItem icon={<Bot />} label="NIH Evidence" to="/nih-evidence" />
-          <NavItem icon={<Heart />} label="SIBO Success" to="/sibo-success" />
+          <NavItem icon={<Home />} label="Home" to="/home" onPrefetch={routePrefetchers['/home']} />
+          <NavItem icon={<Table />} label="Dashboard" to="/dashboard" onPrefetch={routePrefetchers['/dashboard']} />
+          <NavItem icon={<Activity />} label="Breath Tests" to="/breath-tests" onPrefetch={routePrefetchers['/breath-tests']} />
+          <NavItem icon={<Utensils />} label="Food Hub" to="/food-hub" onPrefetch={routePrefetchers['/food-hub']} />
+          <NavItem icon={<BookOpen />} label="Education" to="/education" onPrefetch={routePrefetchers['/education']} />
+          <NavItem icon={<Bot />} label="NIH Evidence" to="/nih-evidence" onPrefetch={routePrefetchers['/nih-evidence']} />
+          <NavItem icon={<Heart />} label="SIBO Success" to="/sibo-success" onPrefetch={routePrefetchers['/sibo-success']} />
         </nav>
 
         <div className="p-4 mt-auto space-y-4">
@@ -148,7 +162,7 @@ export default function Layout() {
           </div>
           
           <nav className="space-y-1">
-            <NavItem icon={<Settings />} label="Settings" to="/settings" />
+            <NavItem icon={<Settings />} label="Settings" to="/settings" onPrefetch={routePrefetchers['/settings']} />
           </nav>
         </div>
       </aside>
@@ -156,7 +170,7 @@ export default function Layout() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-auto md:h-screen overflow-visible md:overflow-y-auto relative">
         {/* Top Header */}
-        <header className="sticky top-0 z-10 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/50 px-4 md:px-8 py-4 flex items-center justify-between">
+        <header className="sticky top-0 z-40 isolate bg-slate-950/90 supports-[backdrop-filter]:bg-slate-950/70 backdrop-blur-xl border-b border-slate-800/60 px-4 md:px-8 py-4 flex items-center justify-between shadow-lg shadow-slate-950/40">
           <div className="flex items-start gap-3">
             <button
               onClick={() => setIsMobileSidebarOpen(true)}

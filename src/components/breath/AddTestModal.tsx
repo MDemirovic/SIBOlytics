@@ -3,7 +3,6 @@ import { X, AlertCircle, Loader2 } from 'lucide-react';
 import { BreathTest, BreathDataPoint } from '../../types/breathTest';
 import UploadDropzone from './UploadDropzone';
 import ManualEntryTable from './ManualEntryTable';
-import { processFile } from '../../utils/fileParser';
 
 interface AddTestModalProps {
   onClose: () => void;
@@ -23,6 +22,7 @@ export default function AddTestModal({ onClose, onSave }: AddTestModalProps) {
     setIsExtracting(true);
     
     try {
+      const { processFile } = await import('../../utils/fileParser');
       const result = await processFile(file);
       if (result.success && result.data.length > 0) {
         setExtractedData(result.data);

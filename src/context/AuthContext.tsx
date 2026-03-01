@@ -52,10 +52,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 2500);
+
     const loadCurrentUser = async () => {
       try {
         const response = await fetch(apiUrl('/api/auth/me'), {
           credentials: 'include',
+          signal: controller.signal,
         });
         const data = await parseResponse<{ user: User | null }>(response);
         if (response.ok) {
@@ -66,11 +70,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {
         setUser(null);
       } finally {
+        window.clearTimeout(timeoutId);
         setLoading(false);
       }
     };
 
     loadCurrentUser();
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<AuthResult> => {
@@ -255,8 +265,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false, error: 'Cannot connect to auth server.' };
     }
   };
-
-  if (loading) return null;
 
   return (
     <AuthContext.Provider

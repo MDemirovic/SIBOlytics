@@ -17,6 +17,48 @@ export default function Onboarding() {
     suspectedTriggers: ''
   });
 
+  const addTriggersToFoodLog = (userId: string, triggersText: string) => {
+    const rawTriggers = triggersText
+      .split(/[,;\n]/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    if (rawTriggers.length === 0) return;
+
+    type LoggedFood = {
+      id: string;
+      name: string;
+      amount: string;
+      status: 'safe' | 'caution' | 'trigger';
+      notes?: string;
+      createdAt: string;
+    };
+
+    const storageKey = `sibolytics_foodlog_${userId}`;
+    const stored = localStorage.getItem(storageKey);
+    const existing: LoggedFood[] = stored ? JSON.parse(stored) : [];
+    const existingNames = new Set(
+      existing.map((food) => food.name.trim().toLowerCase())
+    );
+
+    const newItems: LoggedFood[] = [];
+    for (const trigger of rawTriggers) {
+      const normalized = trigger.toLowerCase();
+      if (existingNames.has(normalized)) continue;
+      existingNames.add(normalized);
+      newItems.push({
+        id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        name: trigger,
+        amount: 'suspected',
+        status: 'trigger',
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    if (newItems.length === 0) return;
+    localStorage.setItem(storageKey, JSON.stringify([...newItems, ...existing]));
+  };
+
   const handleNext = async () => {
     if (step < 2) {
       setStep(step + 1);
@@ -28,6 +70,9 @@ export default function Onboarding() {
       if (!result.success) {
         setError(result.error || 'Could not complete onboarding.');
         return;
+      }
+      if (user?.id) {
+        addTriggersToFoodLog(user.id, formData.suspectedTriggers);
       }
       navigate('/home');
     }
@@ -132,7 +177,7 @@ export default function Onboarding() {
             
             <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
               <p className="text-xs text-blue-300 leading-relaxed">
-                <strong>Note:</strong> We will use this to highlight potential risks when you scan your meals.
+                <strong>Note:</strong> We will use this to highlight potential risks in food hub.
               </p>
             </div>
           </div>
