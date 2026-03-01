@@ -11,6 +11,7 @@ interface ManualEntryTableProps {
 export default function ManualEntryTable({ initialData, onSave, onCancel }: ManualEntryTableProps) {
   const [substrate, setSubstrate] = useState<'glucose' | 'lactulose' | 'unknown'>('lactulose');
   const [notes, setNotes] = useState('');
+  const [testDate, setTestDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [dataPoints, setDataPoints] = useState<BreathDataPoint[]>([
     { minute: 0, h2: 0, ch4: 0 },
     { minute: 15, h2: 0, ch4: 0 },
@@ -48,13 +49,14 @@ export default function ManualEntryTable({ initialData, onSave, onCancel }: Manu
       substrate,
       units: 'ppm',
       data: sortedData,
-      notes
+      notes,
+      testDate: testDate || undefined
     });
   };
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col h-full">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1.5">Substrate</label>
           <select 
@@ -66,6 +68,15 @@ export default function ManualEntryTable({ initialData, onSave, onCancel }: Manu
             <option value="glucose">Glucose</option>
             <option value="unknown">Unknown</option>
           </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">Test Date</label>
+          <input
+            type="date"
+            value={testDate}
+            onChange={(e) => setTestDate(e.target.value)}
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1.5">Notes (Optional)</label>

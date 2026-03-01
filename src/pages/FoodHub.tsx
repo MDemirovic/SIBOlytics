@@ -25,6 +25,7 @@ export default function FoodHub() {
   const [loggedFoods, setLoggedFoods] = useState<LoggedFood[]>([]);
   const [isAddingFood, setIsAddingFood] = useState(false);
   const [newFood, setNewFood] = useState({ name: '', amount: '', status: 'safe' as const, notes: '' });
+  const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -55,9 +56,13 @@ export default function FoodHub() {
   };
 
   const handleDeleteFood = (id: string) => {
-    if (window.confirm('Delete this logged food?')) {
-      saveLoggedFoods(loggedFoods.filter(f => f.id !== id));
-    }
+    setDeleteCandidateId(id);
+  };
+
+  const confirmDeleteFood = () => {
+    if (!deleteCandidateId) return;
+    saveLoggedFoods(loggedFoods.filter(f => f.id !== deleteCandidateId));
+    setDeleteCandidateId(null);
   };
 
   const filteredDatabase = foods.filter(food => {
@@ -78,6 +83,7 @@ export default function FoodHub() {
     food.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (food.notes && food.notes.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+  const deleteCandidate = loggedFoods.find(food => food.id === deleteCandidateId);
 
   const getBadgeConfig = (level: FoodItem['fodmapLevel']) => {
     switch (level) {
@@ -279,7 +285,7 @@ export default function FoodHub() {
                         </div>
                         <button 
                           onClick={() => handleDeleteFood(food.id)}
-                          className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                          className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -372,6 +378,40 @@ export default function FoodHub() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleteCandidate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-white">Delete this food log?</h3>
+                <p className="text-sm text-slate-400 mt-2">
+                  This action cannot be undone. You are deleting{' '}
+                  <span className="text-slate-200">{deleteCandidate.name}</span> from your personal log.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteCandidateId(null)}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteFood}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition-colors cursor-pointer"
+              >
+                Delete Food
+              </button>
+            </div>
           </div>
         </div>
       )}

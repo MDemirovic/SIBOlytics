@@ -36,9 +36,14 @@ export default function Home() {
             >
               Explore Food Hub <ChevronRight className="w-4 h-4" />
             </button>
+            <button 
+              onClick={() => navigate('/education')}
+              className="px-6 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-700 text-white font-medium transition-colors flex items-center gap-2 cursor-pointer"
+            >
+              Learn about SIBO <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
-          
-          <p className="text-xs text-slate-500">Educational only. Not medical advice.</p>
+
         </div>
       </section>
 

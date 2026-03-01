@@ -8,6 +8,7 @@ export interface BreathDataPoint {
 export interface BreathTest {
   id: string;
   createdAt: string;
+  testDate?: string;
   substrate: 'glucose' | 'lactulose' | 'unknown';
   units: 'ppm';
   data: BreathDataPoint[];

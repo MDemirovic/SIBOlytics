@@ -105,7 +105,8 @@ export default function BreathTests() {
   };
 
   const formatTestOption = (test: BreathTest) => {
-    const date = new Date(test.createdAt).toLocaleDateString();
+    const dateSource = test.testDate ?? test.createdAt;
+    const date = new Date(dateSource).toLocaleDateString();
     return `${date} - ${test.substrate}`;
   };
 
@@ -239,7 +240,7 @@ export default function BreathTests() {
                 <p className="text-sm text-slate-400 mt-2">
                   This action cannot be undone. You are deleting the{' '}
                   <span className="capitalize text-slate-200">{deleteCandidate.substrate}</span> test from{' '}
-                  <span className="text-slate-200">{new Date(deleteCandidate.createdAt).toLocaleDateString()}</span>.
+                  <span className="text-slate-200">{new Date(deleteCandidate.testDate ?? deleteCandidate.createdAt).toLocaleDateString()}</span>.
                 </p>
               </div>
             </div>

@@ -37,7 +37,7 @@ export default function TestHistory({ tests, selectedTestId, onSelect, onDelete 
   return (
     <div className="flex flex-col gap-3">
       {tests.map(test => {
-        const date = new Date(test.createdAt).toLocaleDateString();
+        const date = new Date(test.testDate ?? test.createdAt).toLocaleDateString();
         const isSelected = test.id === selectedTestId;
         const label = getLabel(test);
         
@@ -68,7 +68,7 @@ export default function TestHistory({ tests, selectedTestId, onSelect, onDelete 
                   e.stopPropagation();
                   onDelete(test.id);
                 }}
-                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors"
+                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
                 title="Delete test"
               >
                 <Trash2 className="w-4 h-4" />
