@@ -111,7 +111,7 @@ export default function Layout() {
     <div className="min-h-screen md:h-screen bg-slate-950 text-slate-50 font-sans flex flex-col md:flex-row overflow-x-hidden md:overflow-hidden">
       {isMobileSidebarOpen && (
         <button
-          className="md:hidden fixed inset-0 z-30 bg-slate-950/60"
+          className="md:hidden fixed inset-0 z-40 bg-slate-950/60"
           onClick={() => setIsMobileSidebarOpen(false)}
           aria-label="Close sidebar overlay"
         />
@@ -119,7 +119,7 @@ export default function Layout() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-72 max-w-[85vw] bg-slate-900/95 backdrop-blur-xl border-r border-slate-800 flex flex-col overflow-y-auto transform transition-transform duration-200 md:static md:z-auto md:w-64 md:max-w-none md:bg-slate-900/50 md:border-b-0 md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-slate-900/95 backdrop-blur-xl border-r border-slate-800 flex flex-col overflow-y-auto transform transition-transform duration-200 md:static md:z-auto md:w-64 md:max-w-none md:bg-slate-900/50 md:border-b-0 md:translate-x-0 ${
           isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -170,7 +170,7 @@ export default function Layout() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-auto md:h-screen overflow-visible md:overflow-y-auto relative">
         {/* Top Header */}
-        <header className="sticky top-0 z-40 isolate bg-slate-950/90 supports-[backdrop-filter]:bg-slate-950/70 backdrop-blur-xl border-b border-slate-800/60 px-4 md:px-8 py-4 flex items-center justify-between shadow-lg shadow-slate-950/40">
+        <header className="sticky top-0 z-30 isolate bg-slate-950/90 supports-[backdrop-filter]:bg-slate-950/70 backdrop-blur-xl border-b border-slate-800/60 px-4 md:px-8 py-4 flex items-center justify-between shadow-lg shadow-slate-950/40">
           <div className="flex items-start gap-3">
             <button
               onClick={() => setIsMobileSidebarOpen(true)}
