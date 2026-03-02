@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, Bot, BookOpen, CheckCircle2, ChevronRight } from 'lucide-react';
+import { Activity, Bot, BookOpen, CheckCircle2, Utensils } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Home() {
@@ -9,149 +9,107 @@ export default function Home() {
   const firstName = user?.name?.split(' ')[0] || '';
 
   return (
-    <div className="space-y-8 w-full">
+    <div className="space-y-10 md:space-y-12 w-full">
       {/* Hero Card */}
       <section className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40 p-8 md:p-10">
-        {/* Background Gradient Glow */}
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 rounded-full bg-blue-600/20 blur-3xl pointer-events-none"></div>
-        
-        <div className="relative z-10 max-w-2xl">
-          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-white mb-4">
+
+        <div className="relative z-10 max-w-3xl">
+          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-white mb-4 break-words">
             Welcome{firstName ? `, ${firstName}` : '.'}
           </h1>
-          <p className="text-slate-300 text-lg mb-8 leading-relaxed">
-            Start tracking your breath tests, log your personal food triggers, and learn from reliable sources—tailored for SIBO.
+          <p className="text-slate-300 text-lg leading-relaxed">
+            Track your breath tests, understand your food triggers, and learn from reliable evidence tailored for SIBO.
           </p>
-          
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
-            <button 
+
+          <div className="mt-8 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <button
               onClick={() => navigate('/breath-tests')}
               className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors cursor-pointer"
             >
-              Start with Breath Test
+              Start Tracking
             </button>
-            <button 
+            <button
               onClick={() => navigate('/food-hub')}
-              className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium transition-colors flex items-center gap-2 cursor-pointer"
+              className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium transition-colors cursor-pointer"
             >
-              Explore Food Hub <ChevronRight className="w-4 h-4" />
+              Explore Food Hub
             </button>
-            <button 
+            <button
               onClick={() => navigate('/education')}
-              className="px-6 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-700 text-white font-medium transition-colors flex items-center gap-2 cursor-pointer"
+              className="px-6 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-700 text-white font-medium transition-colors cursor-pointer"
             >
-              Learn about SIBO <ChevronRight className="w-4 h-4" />
+              Learn about SIBO
             </button>
           </div>
-
         </div>
       </section>
 
-      {/* Quick Steps */}
+      {/* How It Works */}
       <section>
-        <h2 className="text-xl font-medium text-white mb-4">Start here</h2>
+        <h2 className="text-xl font-medium text-white mb-4">How it works</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          
-          {/* Card 1 */}
-          <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 flex flex-col h-full hover:border-slate-700 transition-colors">
+          <button
+            onClick={() => navigate('/breath-tests')}
+            className="text-left bg-slate-900/35 border border-slate-800 rounded-2xl p-6 h-full hover:border-slate-700 transition-colors"
+          >
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 font-semibold text-lg">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 font-semibold">
                 1
               </div>
-              <Activity className="w-6 h-6 text-blue-400" />
+              <Activity className="w-5 h-5 text-blue-400" />
             </div>
-            <h3 className="text-lg font-medium text-white mb-2">Add your breath test</h3>
-            <p className="text-sm text-slate-400 mb-6 flex-1">
-              Upload your results (CSV, PDF, or photo) or enter them manually.
+            <h3 className="text-base font-medium text-white mb-2">Track your breath tests</h3>
+            <p className="text-sm text-slate-400">
+              Upload results or add them manually to build your timeline.
             </p>
-            <button 
-              onClick={() => navigate('/breath-tests')}
-              className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer"
-            >
-              Go to Breath Tests <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+          </button>
 
-          {/* Card 2 */}
-          <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 flex flex-col h-full hover:border-slate-700 transition-colors">
+          <button
+            onClick={() => navigate('/food-hub')}
+            className="text-left bg-slate-900/35 border border-slate-800 rounded-2xl p-6 h-full hover:border-slate-700 transition-colors"
+          >
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 font-semibold text-lg">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 font-semibold">
                 2
               </div>
-              <span className="text-2xl">
-              🍴
-              </span>
+              <Utensils className="w-5 h-5 text-amber-400" />
             </div>
-            <h3 className="text-lg font-medium text-white mb-2">Filter your foods</h3>
-            <p className="text-sm text-slate-400 mb-6 flex-1">
-              Check Low/Caution/High in the Food Hub database.
+            <h3 className="text-base font-medium text-white mb-2">Understand your food triggers</h3>
+            <p className="text-sm text-slate-400">
+              Use the Food Hub to find patterns and reduce symptom flare-ups.
             </p>
-            <button 
-              onClick={() => navigate('/food-hub')}
-              className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer"
-            >
-              Go to Food Hub <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+          </button>
 
-          {/* Card 3 */}
-          <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 flex flex-col h-full hover:border-slate-700 transition-colors">
+          <button
+            onClick={() => navigate('/nih-evidence')}
+            className="text-left bg-slate-900/35 border border-slate-800 rounded-2xl p-6 h-full hover:border-slate-700 transition-colors"
+          >
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 font-semibold text-lg">
+              <div className="w-9 h-9 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-semibold">
                 3
               </div>
-              <Bot className="w-6 h-6 text-purple-400" />
+              <Bot className="w-5 h-5 text-indigo-400" />
             </div>
-            <h3 className="text-lg font-medium text-white mb-2">Ask NIH evidence</h3>
-            <p className="text-sm text-slate-400 mb-6 flex-1">
-              Get answers with citations from NIH sources only.
+            <h3 className="text-base font-medium text-white mb-2">Learn from evidence-based research</h3>
+            <p className="text-sm text-slate-400">
+              Ask questions and review NIH-only sources with citations.
             </p>
-            <button 
-              onClick={() => navigate('/nih-evidence')}
-              className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer"
-            >
-              Go to NIH Evidence <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-        </div>
-      </section>
-
-      {/* Read the SIBO Guide Row Card */}
-      <section>
-        <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:border-slate-700 transition-colors">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
-              <BookOpen className="w-6 h-6 text-blue-400" />
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-white mb-1">Read the SIBO Guide</h3>
-              <p className="text-sm text-slate-400">
-                Simple, structured education to understand SIBO basics.
-              </p>
-            </div>
-          </div>
-          <button 
-            onClick={() => navigate('/education')}
-            className="shrink-0 py-2.5 px-5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium transition-colors flex items-center gap-2 cursor-pointer"
-          >
-            Go to Education <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       </section>
 
-      {/* Bottom Panel */}
+      {/* Why SIBOlytics */}
       <section className="bg-slate-900/40 border border-slate-800 rounded-2xl p-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
-          {/* What you can do here */}
           <div>
-            <h2 className="text-xl font-medium text-white mb-6">What you can do here</h2>
+            <h2 className="text-xl font-medium text-white mb-6">Why SIBOlytics?</h2>
             <ul className="space-y-4">
               {[
                 'Track breath tests',
                 'Build your personal food tolerance log',
                 'Learn from NIH-only sources',
-                'Use success stories for relapse prevention motivation'
+                'Use success stories for motivation',
               ].map((item, i) => (
                 <li key={i} className="flex items-start gap-3 text-sm text-slate-300">
                   <CheckCircle2 className="w-5 h-5 text-blue-500 shrink-0" />
@@ -161,14 +119,16 @@ export default function Home() {
             </ul>
           </div>
 
-          {/* Tips */}
           <div>
-            <h2 className="text-xl font-medium text-white mb-6">Tips</h2>
+            <h2 className="text-xl font-medium text-white mb-6 flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-blue-400" />
+              Getting Started Tip
+            </h2>
             <ul className="space-y-4">
               {[
-                'Start with a breath test or your symptoms baseline.',
-                'Use Food Hub to build an safe food list and manage symptoms',
-                'Bring your tracked data to your clinician.'
+                'Start by adding your first breath test to establish a clear baseline.',
+                'Review Food Hub after logging symptoms to identify likely triggers.',
+                'Bring your tracked timeline to your clinician for focused decisions.',
               ].map((tip, i) => (
                 <li key={i} className="flex items-start gap-3 text-sm text-slate-400">
                   <div className="w-1.5 h-1.5 rounded-full bg-slate-600 shrink-0 mt-2" />

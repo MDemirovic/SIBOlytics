@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { 
   Activity, 
   Clock, 
@@ -17,6 +17,8 @@ import {
   ResponsiveContainer 
 } from 'recharts';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { BreathTest } from '../types/breathTest';
 
 const symptomData = [
   { day: 'Mon', bloating: 6, stress: 4 },
@@ -43,8 +45,102 @@ function MetricCard({ title, value, subtitle, icon, trend }: { title: string, va
   );
 }
 
+function getTestTimestamp(test: BreathTest): number {
+  const primary = Date.parse(test.testDate ?? '');
+  if (!Number.isNaN(primary)) return primary;
+  const fallback = Date.parse(test.createdAt ?? '');
+  return Number.isNaN(fallback) ? 0 : fallback;
+}
+
+function getLatestBreathTestSummary(tests: BreathTest[]): { value: string; subtitle: string } {
+  if (tests.length === 0) {
+    return {
+      value: 'No Tests Yet',
+      subtitle: 'Add a test in Breath Tests',
+    };
+  }
+
+  const latest = tests.reduce((currentLatest, candidate) =>
+    getTestTimestamp(candidate) > getTestTimestamp(currentLatest) ? candidate : currentLatest
+  );
+
+  const dateLabel = new Date(getTestTimestamp(latest)).toLocaleDateString();
+  if (!latest.data || latest.data.length === 0) {
+    return {
+      value: 'No Data',
+      subtitle: `${dateLabel} • Empty test data`,
+    };
+  }
+
+  const baselineH2 = latest.data[0]?.h2 || 0;
+  const peakH2Point = latest.data.reduce((max, point) => (point.h2 > max.h2 ? point : max), latest.data[0]);
+  const peakCH4Point = latest.data.reduce((max, point) => (point.ch4 > max.ch4 ? point : max), latest.data[0]);
+  const h2Rise = peakH2Point.h2 - baselineH2;
+  const isH2Positive = h2Rise >= 20;
+  const isCH4Positive = peakCH4Point.ch4 >= 10;
+
+  if (isH2Positive && isCH4Positive) {
+    return {
+      value: 'Mixed Pattern',
+      subtitle: `${dateLabel} • H2 ${peakH2Point.h2}ppm / CH4 ${peakCH4Point.ch4}ppm`,
+    };
+  }
+  if (isH2Positive) {
+    return {
+      value: 'H2 Dominant',
+      subtitle: `${dateLabel} • Peak H2 ${peakH2Point.h2}ppm at ${peakH2Point.minute}min`,
+    };
+  }
+  if (isCH4Positive) {
+    return {
+      value: 'CH4 Dominant',
+      subtitle: `${dateLabel} • Peak CH4 ${peakCH4Point.ch4}ppm at ${peakCH4Point.minute}min`,
+    };
+  }
+
+  return {
+    value: 'Normal Pattern',
+    subtitle: `${dateLabel} • H2 ${peakH2Point.h2}ppm / CH4 ${peakCH4Point.ch4}ppm`,
+  };
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [tests, setTests] = useState<BreathTest[]>([]);
+
+  useEffect(() => {
+    if (!user) {
+      setTests([]);
+      return;
+    }
+
+    const storageKey = `sibolytics_breathtests_${user.id}`;
+    const loadTests = () => {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) {
+        setTests([]);
+        return;
+      }
+      try {
+        const parsed = JSON.parse(raw);
+        setTests(Array.isArray(parsed) ? parsed : []);
+      } catch {
+        setTests([]);
+      }
+    };
+
+    loadTests();
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === storageKey) {
+        loadTests();
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [user]);
+
+  const latestBreathTest = useMemo(() => getLatestBreathTestSummary(tests), [tests]);
 
   return (
     <div className="space-y-6">
@@ -66,8 +162,8 @@ export default function Dashboard() {
         />
         <MetricCard 
           title="Last Breath Test" 
-          value="H2 Dominant" 
-          subtitle="Peak 85ppm at 90min"
+          value={latestBreathTest.value} 
+          subtitle={latestBreathTest.subtitle}
           icon={<FileText className="w-5 h-5 text-indigo-400" />}
           trend="neutral"
         />
