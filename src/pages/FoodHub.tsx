@@ -130,8 +130,8 @@ export default function FoodHub() {
       <header>
         <h1 className="text-3xl font-semibold tracking-tight text-white mb-2">Food Hub</h1>
         <p className="text-slate-400 max-w-3xl">
-          A "low FODMAP" diet temporarily restricts certain fermentable carbs to help identify symptom triggers and manage symptoms. 
-          Use this database to check foods during your elimination phase. 
+          A low FODMAP diet temporarily reduces certain fermentable carbohydrates to help identify symptom triggers and manage digestive discomfort.
+Use this database during your elimination phase. Low FODMAP is a short-term strategy — gradually reintroduce foods one by one to identify your personal triggers.
         </p>
        
       </header>

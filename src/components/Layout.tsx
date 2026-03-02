@@ -22,6 +22,7 @@ import { useAuth } from '../context/AuthContext';
 const routePrefetchers: Record<string, () => void> = {
   '/home': () => { void import('../pages/Home'); },
   '/dashboard': () => { void import('../pages/Dashboard'); },
+  '/symptom-diary': () => { void import('../pages/SymptomDiary'); },
   '/breath-tests': () => { void import('../pages/BreathTests'); },
   '/food-hub': () => { void import('../pages/FoodHub'); },
   '/education': () => { void import('../pages/Education'); },
@@ -88,6 +89,8 @@ export default function Layout() {
         return { title: 'Home' };
       case '/dashboard':
         return { title: `Good morning, ${user?.name || 'Guest'}`, subtitle: 'Here is your daily digestive overview.' };
+      case '/symptom-diary':
+        return { title: 'Daily Symptom Diary', subtitle: 'Log your daily symptoms to track trends over time.' };
       case '/breath-tests':
         return { title: 'Breath Tests', subtitle: 'Track and analyze your SIBO breath test results over time.' };
       case '/food-hub':
@@ -143,10 +146,11 @@ export default function Layout() {
         <nav className="flex-1 px-4 py-4 space-y-1">
           <NavItem icon={<Home />} label="Home" to="/home" onPrefetch={routePrefetchers['/home']} />
           <NavItem icon={<Table />} label="Dashboard" to="/dashboard" onPrefetch={routePrefetchers['/dashboard']} />
+          <NavItem icon={<FileText />} label="Symptom Log" to="/symptom-diary" onPrefetch={routePrefetchers['/symptom-diary']} />
           <NavItem icon={<Activity />} label="Breath Tests" to="/breath-tests" onPrefetch={routePrefetchers['/breath-tests']} />
           <NavItem icon={<Utensils />} label="Food Hub" to="/food-hub" onPrefetch={routePrefetchers['/food-hub']} />
           <NavItem icon={<BookOpen />} label="Education" to="/education" onPrefetch={routePrefetchers['/education']} />
-          <NavItem icon={<Bot />} label="NIH Evidence" to="/nih-evidence" onPrefetch={routePrefetchers['/nih-evidence']} />
+          <NavItem icon={<Bot />} label="NIH AI Assistant" to="/nih-evidence" onPrefetch={routePrefetchers['/nih-evidence']} />
           <NavItem icon={<Heart />} label="SIBO Success" to="/sibo-success" onPrefetch={routePrefetchers['/sibo-success']} />
         </nav>
 
@@ -160,6 +164,7 @@ export default function Layout() {
               SIBOlytics is an educational tool. Always consult your gastroenterologist before changing your treatment.
             </p>
           </div>
+          
           
           <nav className="space-y-1">
             <NavItem icon={<Settings />} label="Settings" to="/settings" onPrefetch={routePrefetchers['/settings']} />

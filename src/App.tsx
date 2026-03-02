@@ -17,6 +17,7 @@ const ResetPassword = React.lazy(() => import('./pages/ResetPassword'));
 const Onboarding = React.lazy(() => import('./pages/Onboarding'));
 const Home = React.lazy(() => import('./pages/Home'));
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const SymptomDiary = React.lazy(() => import('./pages/SymptomDiary'));
 const BreathTests = React.lazy(() => import('./pages/BreathTests'));
 const FoodHub = React.lazy(() => import('./pages/FoodHub'));
 const Education = React.lazy(() => import('./pages/Education'));
@@ -58,6 +59,7 @@ function AppRoutes() {
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route path="/home" element={<Home />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/symptom-diary" element={<SymptomDiary />} />
           <Route path="/breath-tests" element={<BreathTests />} />
           <Route path="/food-hub" element={<FoodHub />} />
           <Route path="/education" element={<Education />} />

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, Bot, BookOpen, CheckCircle2, Utensils } from 'lucide-react';
+import { Activity, Bot, BookOpen, CheckCircle2, FileText, Utensils } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Home() {
@@ -15,7 +15,7 @@ export default function Home() {
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 rounded-full bg-blue-600/20 blur-3xl pointer-events-none"></div>
 
         <div className="relative z-10 max-w-3xl">
-          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-white mb-4 break-words">
+          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-white mb-4 wrap-break-word">
             Welcome{firstName ? `, ${firstName}` : '.'}
           </h1>
           <p className="text-slate-300 text-lg leading-relaxed">
@@ -48,14 +48,30 @@ export default function Home() {
       {/* How It Works */}
       <section>
         <h2 className="text-xl font-medium text-white mb-4">How it works</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <button
+            onClick={() => navigate('/symptom-diary')}
+            className="text-left bg-slate-900/35 border border-slate-800 rounded-2xl p-6 h-full hover:border-slate-700 transition-colors"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 font-semibold">
+                1
+              </div>
+              <FileText className="w-5 h-5 text-cyan-400" />
+            </div>
+            <h3 className="text-base font-medium text-white mb-2">Log symptoms daily</h3>
+            <p className="text-sm text-slate-400">
+              Track pain, bloating, stool, stress, sleep, diarrhea, and energy to spot routines over time.
+            </p>
+          </button>
+
           <button
             onClick={() => navigate('/breath-tests')}
             className="text-left bg-slate-900/35 border border-slate-800 rounded-2xl p-6 h-full hover:border-slate-700 transition-colors"
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 font-semibold">
-                1
+                2
               </div>
               <Activity className="w-5 h-5 text-blue-400" />
             </div>
@@ -71,7 +87,7 @@ export default function Home() {
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 font-semibold">
-                2
+                3
               </div>
               <Utensils className="w-5 h-5 text-amber-400" />
             </div>
@@ -87,7 +103,7 @@ export default function Home() {
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="w-9 h-9 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-semibold">
-                3
+                4
               </div>
               <Bot className="w-5 h-5 text-indigo-400" />
             </div>

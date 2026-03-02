@@ -113,7 +113,7 @@ export default function Onboarding() {
                   <button
                     key={sym}
                     onClick={() => setFormData({...formData, primarySymptom: sym})}
-                    className={`p-3 rounded-xl border text-sm font-medium transition-all ${
+                    className={`p-3 rounded-xl border text-sm font-medium transition-all cursor-pointer ${
                       formData.primarySymptom === sym 
                         ? 'bg-blue-600/20 border-blue-500 text-blue-400' 
                         : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
@@ -134,7 +134,7 @@ export default function Onboarding() {
                 min="1" max="10" 
                 value={formData.severity}
                 onChange={(e) => setFormData({...formData, severity: parseInt(e.target.value)})}
-                className="w-full accent-blue-500"
+                className="w-full accent-blue-500 cursor-pointer"
               />
             </div>
 
@@ -145,7 +145,7 @@ export default function Onboarding() {
                   <button
                     key={pat}
                     onClick={() => setFormData({...formData, stoolPattern: pat})}
-                    className={`p-3 rounded-xl border text-sm font-medium transition-all ${
+                    className={`cursor-pointer p-3 rounded-xl border text-sm font-medium transition-all cursor-pointer ${
                       formData.stoolPattern === pat 
                         ? 'bg-blue-600/20 border-blue-500 text-blue-400' 
                         : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
@@ -193,7 +193,7 @@ export default function Onboarding() {
           <button 
             onClick={handleNext}
             disabled={isSubmitting || (step === 1 && (!formData.primarySymptom || !formData.stoolPattern))}
-            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-xl font-medium transition-colors flex items-center gap-2"
+            className="cursor-pointer bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-xl font-medium transition-colors flex items-center gap-2"
           >
             {step === 1 ? 'Next Step' : (isSubmitting ? 'Saving...' : 'Go to Dashboard')}
             <ChevronRight className="w-4 h-4" />
