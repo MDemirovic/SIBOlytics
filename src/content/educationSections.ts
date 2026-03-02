@@ -151,5 +151,37 @@ export const educationSections: EducationSection[] = [
       'Treatment Timing: It is generally recommended to wait 2-3 weeks after finishing a treatment protocol before retesting or judging its full success.'
     ],
     evidenceNote: 'Based on Pimentel 2026 research; educational only.'
+  },
+  {
+    id: 'practical-reading-framework',
+    title: '13. Practical Breath Test Reading (Pimentel Framework)',
+    summary: 'A practical sequence for reading a SIBO/IMO breath report in clinic-style order.',
+    bullets: [
+      'Step 1: Check baseline values first, then analyze the first 90 minutes. High baseline values can reduce interpretation quality if preparation was suboptimal.',
+      'Step 2: Hydrogen-positive pattern is defined as >=20 ppm rise from baseline by 90 minutes (North American Consensus).',
+      'Step 3: Methane-positive pattern (IMO) is defined as methane >=10 ppm at any point during the test and is commonly linked to constipation phenotype.',
+      'Step 4: A late-only hydrogen rise (after 90 min) is more compatible with colonic fermentation than classic small-bowel overgrowth.',
+      'Step 5: Substrate context matters: glucose is often more specific (but can miss distal overgrowth), while lactulose is more sensitive (but can include late colonic signal).',
+      'Step 6: Always combine gas pattern + symptom phenotype + test preparation quality before treatment decisions.'
+    ],
+    evidenceNote: 'Educational summary based on North American Consensus and Pimentel-led literature; not a diagnosis.',
+    optionalLinks: [
+      {
+        label: 'North American Consensus on Breath Testing (2017)',
+        url: 'https://pubmed.ncbi.nlm.nih.gov/28323273/'
+      },
+      {
+        label: 'ACG Clinical Guideline: SIBO (2020)',
+        url: 'https://pubmed.ncbi.nlm.nih.gov/32023228/'
+      },
+      {
+        label: 'Methane slows intestinal transit (Pimentel et al., 2006)',
+        url: 'https://pubmed.ncbi.nlm.nih.gov/16630746/'
+      },
+      {
+        label: 'Post-infectious IBS biomarker model (Pimentel et al., 2015)',
+        url: 'https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0126438'
+      }
+    ]
   }
 ];

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, AlertCircle, CheckCircle2, AlertTriangle, Plus, Trash2 } from 'lucide-react';
 import { foods, FoodItem } from '../data/foods_from_pdf';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 interface LoggedFood {
   id: string;
@@ -12,20 +13,353 @@ interface LoggedFood {
   createdAt: string;
 }
 
+const HR_FOOD_CATEGORY_MAP: Record<string, string> = {
+  Fruits: 'Voce',
+  Vegetables: 'Povrce',
+  'Nuts and Seeds': 'Orasasti plodovi i sjemenke',
+  'Grains and Starches': 'Zitarice i skrob',
+  Proteins: 'Proteini',
+  'Dairy / Dairy Alternatives': 'Mliječni proizvodi / zamjene',
+  Beverages: 'Pica',
+  'Fats and Oils': 'Masti i ulja',
+  'Condiments, Seasonings, and Baking Supplies': 'Dodaci, zacini i sastojci za pecenje',
+  Sweeteners: 'Zasladivaci',
+  'Sweets and Desserts': 'Slatko i deserti',
+  'High-FODMAP Checklist': 'Visoki FODMAP popis',
+};
+
+const HR_FOOD_NAME_MAP: Record<string, string> = {
+  Bananas: 'Banane',
+  Blueberries: 'Borovnice',
+  Cantaloupe: 'Dinja',
+  Clementine: 'Klementina',
+  Cranberries: 'Brusnice',
+  'Honeydew melon': 'Medna dinja',
+  Kiwi: 'Kivi',
+  Lemon: 'Limun',
+  Lime: 'Limeta',
+  Orange: 'Naranca',
+  'Passion fruit': 'Marakuja',
+  Pineapple: 'Ananas',
+  Raisins: 'Grozdice',
+  Starfruit: 'Karambola',
+  Strawberries: 'Jagode',
+  Alfalfa: 'Lucerna',
+  Arugula: 'Rikola',
+  'Bamboo shoots': 'Izdanci bambusa',
+  'Bean sprouts': 'Klice graha',
+  'Bell peppers': 'Paprika',
+  Broccoli: 'Brokula',
+  Celery: 'Celer',
+  Cucumber: 'Krastavac',
+  Eggplant: 'Patlidzan',
+  Endive: 'Endivija',
+  Fennel: 'Komorac',
+  'Green beans': 'Zelene mahune',
+  Kale: 'Kelj',
+  Lettuce: 'Salata',
+  Okra: 'Okra',
+  Potato: 'Krumpir',
+  Rutabaga: 'Zuta repa',
+  'Spaghetti squash': 'Spageti tikva',
+  Spinach: 'Spinat',
+  'Summer squash': 'Ljetna tikva',
+  'Spring onion': 'Mladi luk',
+  Tomatoes: 'Rajcice',
+  Turnips: 'Repa',
+  Yam: 'Jam',
+  Zucchini: 'Tikvice',
+  Almonds: 'Bademi',
+  Cornmeal: 'Kukuruzno brasno',
+  'Corn tortillas/chips': 'Kukuruzne tortilje/cips',
+  'Gluten-free bread': 'Bezglutenski kruh',
+  Grits: 'Kukuruzna krupica',
+  Millet: 'Proso',
+  Oats: 'Zob',
+  'Popcorn (plain or salted)': 'Kokice (obicne ili slane)',
+  'Potato chips (plain)': 'Cips od krumpira (obicni)',
+  Quinoa: 'Kvinoja',
+  Rice: 'Riza',
+  'Rice cakes': 'Rizini krekeri',
+  'Rice noodles': 'Rizini rezanci',
+  Tapioca: 'Tapioka',
+  Yams: 'Jam',
+  Beef: 'Govedina',
+  Chicken: 'Piletina',
+  'Eggs / egg substitute': 'Jaja / zamjena za jaja',
+  Fish: 'Riba',
+  Lamb: 'Janjetina',
+  Pork: 'Svinjetina',
+  Shellfish: 'Skoljkasi',
+  Turkey: 'Puretina',
+  Chickpeas: 'Slanutak',
+  Tempeh: 'Tempeh',
+  Tofu: 'Tofu',
+  'Almond Milk': 'Bademovo mlijeko',
+  'Cheese (aged, including cheddar, swiss, parmesan, brie, havarti, camembert)': 'Sir (odlezani: cheddar, swiss, parmezan, brie, havarti, camembert)',
+  'Cheese (not aged, including feta, American, mozzarella, fresh chevre, queso fresco)': 'Sir (svjezi: feta, americki, mozzarella, svjezi kozji, queso fresco)',
+  'Lactose-free kefir': 'Kefir bez laktoze',
+  'Lactose-free sour cream': 'Kiselo vrhnje bez laktoze',
+  'Lactose-free yogurt (plain)': 'Jogurt bez laktoze (obicni)',
+  'Rice milk': 'Rizino mlijeko',
+  Beer: 'Pivo',
+  'Black tea': 'Crni caj',
+  Espresso: 'Espresso',
+  Gin: 'Gin',
+  'Ginger tea': 'Caj od djumbira',
+  'Green tea': 'Zeleni caj',
+  'Peppermint tea': 'Caj od paprene metvice',
+  'Rooibos tea': 'Rooibos caj',
+  Water: 'Voda',
+  Whiskey: 'Viski',
+  'White tea': 'Bijeli caj',
+  Wine: 'Vino',
+  Avocado: 'Avokado',
+  Margarine: 'Margarin',
+  Oil: 'Ulje',
+  Asafoetida: 'Asafetida',
+  'Bakers yeast': 'Pekarski kvasac',
+  'Baking powder/soda': 'Prasak za pecivo / soda bikarbona',
+  Basil: 'Bosiljak',
+  'Bay leaf': 'Lovor',
+  'Black pepper': 'Crni papar',
+  Capers: 'Kapare',
+  Cardamom: 'Kardamom',
+  'Chili powder': 'Cili u prahu',
+  Cilantro: 'Korijander (list)',
+  Cinnamon: 'Cimet',
+  'Cocoa powder': 'Kakao u prahu',
+  Coriander: 'Korijander',
+  Cumin: 'Kim',
+  'Curry powder': 'Curry u prahu',
+  'Fennel seeds': 'Sjemenke komoraca',
+  'Five spice': 'Mjesavina pet zacina',
+  Ginger: 'Djumbir',
+  Lemongrass: 'Limunska trava',
+  Marjoram: 'Majoran',
+  Mint: 'Metvica',
+  Mayonnaise: 'Majoneza',
+  Mustard: 'Senf',
+  Nutmeg: 'Muskatni orascic',
+  Olives: 'Masline',
+  Oregano: 'Origano',
+  Paprika: 'Paprika',
+  Parsley: 'Persin',
+  Pectin: 'Pektin',
+  Rosemary: 'Ruzmarin',
+  Saffron: 'Safran',
+  Salt: 'Sol',
+  'Sesame oil': 'Sezamovo ulje',
+  'Star anise': 'Zvjezdasti anis',
+  'Soy sauce': 'Sojin umak',
+  Tamari: 'Tamari',
+  Tarragon: 'Estragon',
+  'Tomato paste': 'Pire od rajcice',
+  Thyme: 'Majcina dusica',
+  Turmeric: 'Kurkuma',
+  Vanilla: 'Vanilija',
+  Vinegar: 'Ocat',
+  'Worcestershire sauce': 'Worcestershire umak',
+  'Xanthan gum': 'Ksantan guma',
+  Agave: 'Agava',
+  Allspice: 'Piment',
+  'Almond butter': 'Bademov maslac',
+  Apples: 'Jabuke',
+  apricots: 'Marelice',
+  Artichokes: 'Articoke',
+  'Artificial sweeteners not ending in “-ol”': 'Umjetna sladila koja ne zavrsavaju na "-ol"',
+  Asparagus: 'Sparoge',
+  Aspartame: 'Aspartam',
+  'baked beans': 'Peceni grah',
+  'Banana (ripe)': 'Banana (zrela)',
+  barley: 'Jecam',
+  'black beans': 'Crni grah',
+  blackberries: 'Kupine',
+  'Bok choy': 'Pak choi',
+  'Brazil nuts': 'Brazilski orasi',
+  'Breakfast cereals made of rice or corn (e.g. corn flakes, rice krispies': 'Zitarice za dorucak od rize ili kukuruza (npr. corn flakes, rice krispies)',
+  'Brown sugar': 'Smedi secer',
+  'Brussels sprouts': 'Prokulice',
+  Buckwheat: 'Heljda',
+  Butter: 'Maslac',
+  'Butternut squash': 'Butternut tikva',
+  Candy: 'Bomboni',
+  'Cane sugar or syrup': 'Secer od trske ili sirup',
+  carob: 'Rogac',
+  Carrots: 'Mrkva',
+  'Caster sugar': 'Fini kristal secer',
+  Cauliflower: 'Cvjetaca',
+  'chamomile tea': 'Caj od kamilice',
+  cherries: 'Tresnje',
+  Chestnuts: 'Kesteni',
+  'Chia seeds': 'Chia sjemenke',
+  'chicory root': 'Korijen cikorije',
+  Chives: 'Vlasac',
+  Cocoa: 'Kakao',
+  Coconut: 'Kokos',
+  'Coconut milk': 'Kokosovo mlijeko',
+  'Coconut sugar': 'Kokosov secer',
+  Coffee: 'Kava',
+  Corn: 'Kukuruz',
+  'Corn starch': 'Kukuruzni skrob',
+  'Corn syrup (NOT high-fructose)': 'Kukuruzni sirup (NE visokofruktozni)',
+  'cottage cheese': 'Svjezi sir',
+  'Cream cheese': 'Krem sir',
+  currants: 'Ribiz',
+  custard: 'Krema od pudinga',
+  'Dark or semisweet chocolate': 'Tamna ili poluslatka cokolada',
+  dates: 'Datulje',
+  Dextrose: 'Dekstroza',
+  'dried figs': 'Suhe smokve',
+  Edamame: 'Edamame',
+  'Evaporated milk': 'Evaporirano mlijeko',
+  'fava beans': 'Bob',
+  'fennel tea': 'Caj od komoraca',
+  'FOS (fructo-oligosaccharide)': 'FOS (frukto-oligosaharidi)',
+  'fresh figs': 'Svjeze smokve',
+  garlic: 'Cesnjak',
+  'Ginger root': 'Korijen djumbira',
+  Glucose: 'Glukoza',
+  'Gluten-free pasta': 'Bezglutenska tjestenina',
+  'Gluten-free pretzels': 'Bezglutenski pereci',
+  'Golden syrup': 'Zlatni sirup',
+  'Granulated or table sugar': 'Kristalni ili stolni secer',
+  grapefruit: 'Grejp',
+  Grapes: 'Grozde',
+  'Half and Half': 'Pola vrhnje pola mlijeko',
+  'Heavy cream': 'Vrhnje za kuhanje',
+  'high fructose corn syrup': 'Visokofruktozni kukuruzni sirup',
+  honey: 'Med',
+  'ice cream': 'Sladoled',
+  inulin: 'Inulin',
+  isomalt: 'Izomalt',
+  'Jam or jelly': 'Dzem ili zele',
+  'kidney beans': 'Crveni grah',
+  'Lactose-free cottage cheese': 'Svjezi sir bez laktoze',
+  'leek and scallion bulbs': 'Poriluk i mladi luk (bijeli dio)',
+  Lentils: 'Leca',
+  Maltose: 'Maltoza',
+  mango: 'Mango',
+  mannitol: 'Manitol',
+  'Maple Syrup (100% pure)': 'Javorov sirup (100% cisti)',
+  'Mature soybeans (most soy milk and soy flour)': 'Zrela soja (vecina sojinog mlijeka i brasna)',
+  'Milk (cow, sheep, goat)': 'Mlijeko (kravlje, ovcje, kozje)',
+  mushrooms: 'Gljive',
+  'navy beans': 'Bijeli grah',
+  nectarine: 'Nektarina',
+  nectarines: 'Nektarine',
+  'onion and garlic powder': 'Luk i cesnjak u prahu',
+  onions: 'Luk',
+  'Oolong tea': 'Oolong caj',
+  'Palm sugar': 'Palmin secer',
+  Parsnip: 'Pastrnjak',
+  'Peanut butter': 'Maslac od kikirikija',
+  Peanuts: 'Kikiriki',
+  pears: 'Kruske',
+  peas: 'Grasak',
+  Pecans: 'Pekan orasi',
+  persimmon: 'Kaki',
+  'Pine nuts': 'Pinjoli',
+  plums: 'Sljive',
+  Polenta: 'Palenta',
+  'Poppy seeds': 'Mak',
+  prunes: 'Suhe sljive',
+  'Pumpkin seeds': 'Bucine sjemenke',
+  Radish: 'Rotkvica',
+  'Raw sugar': 'Sirovi secer',
+  Rhubarb: 'Rabarbara',
+  'Ricotta cheese': 'Ricotta sir',
+  Rum: 'Rum',
+  Rye: 'Raz',
+  Saccharine: 'Saharin',
+  Seitan: 'Seitan',
+  'Sesame seeds': 'Sezamove sjemenke',
+  shallots: 'Ljutika',
+  'snow peas': 'Snjezni grasak',
+  'Sorbet or sorbetto': 'Sorbet',
+  Sorbitol: 'Sorbitol',
+  soybeans: 'Soja',
+  'split peas': 'Polovljeni grasak',
+  Stevia: 'Stevija',
+  'sugar snap peas': 'Secerni grasak',
+  'sun-dried tomatoes': 'Susene rajcice',
+  'Sunflower seeds': 'Suncokretove sjemenke',
+  'Sweet potato': 'Batat',
+  'Swiss chard': 'Blitva',
+  Walnuts: 'Orasi',
+  Wasabi: 'Wasabi',
+  watermelon: 'Lubenica',
+  wheat: 'Psenica',
+  'white peaches': 'Bijele breskve',
+  xylitol: 'Ksilitol',
+  'yellow peaches': 'Zute breskve',
+  yogurt: 'Jogurt',
+};
+
+function localizeFoodName(food: FoodItem, isHr: boolean): string {
+  if (!isHr) return food.name;
+  return HR_FOOD_NAME_MAP[food.name] ?? food.name;
+}
+
+function localizeFoodCategory(food: FoodItem, isHr: boolean): string {
+  if (!isHr) return food.category;
+  return HR_FOOD_CATEGORY_MAP[food.category] ?? food.category;
+}
+
 export default function FoodHub() {
   const { user } = useAuth();
+  const { isHr } = useLanguage();
   const [activeTab, setActiveTab] = useState<'database' | 'log'>('database');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterLow, setFilterLow] = useState(true);
   const [filterCaution, setFilterCaution] = useState(true);
   const [filterHigh, setFilterHigh] = useState(true);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  
-  // Personal Log State
+
   const [loggedFoods, setLoggedFoods] = useState<LoggedFood[]>([]);
   const [isAddingFood, setIsAddingFood] = useState(false);
   const [newFood, setNewFood] = useState({ name: '', amount: '', status: 'safe' as const, notes: '' });
   const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
+
+  const copy = {
+    title: isHr ? 'Prehrana' : 'Food Hub',
+    subtitle: isHr
+      ? 'Low FODMAP prehrana privremeno smanjuje fermentabilne ugljikohidrate kako bi se prepoznali triggeri i smanjile tegobe. Koristi bazu u eliminacijskoj fazi, pa zatim uvodi hranu jednu po jednu.'
+      : 'A low FODMAP diet temporarily reduces certain fermentable carbohydrates to help identify symptom triggers and manage digestive discomfort. Use this database during your elimination phase, then gradually reintroduce foods one by one.',
+    tabDatabase: isHr ? 'Low FODMAP baza' : 'Low FODMAP Database',
+    tabLog: isHr ? 'Osobni dnevnik hrane' : 'Personal Food Log',
+    searchFoods: isHr ? 'Pretrazi namirnice...' : 'Search foods...',
+    searchLog: isHr ? 'Pretrazi dnevnik...' : 'Search your log...',
+    filters: isHr ? 'Filteri' : 'Filters',
+    level: isHr ? 'FODMAP razina' : 'FODMAP Level',
+    lowSafe: isHr ? 'Nisko (sigurno)' : 'Low (safe)',
+    cautionPortion: isHr ? 'Oprez / porcija' : 'Caution / Portion',
+    high: isHr ? 'Visoko' : 'High',
+    noFoods: isHr ? 'Nema namirnica za odabrane filtere.' : 'No foods found matching your filters.',
+    addFood: isHr ? 'Dodaj hranu' : 'Add Food',
+    noLogs: isHr ? 'Jos nema unosa hrane. Dodaj prvi unos.' : 'No foods logged yet. Add your first food.',
+    amount: isHr ? 'Kolicina' : 'Amount',
+    limitTo: isHr ? 'Limit' : 'Limit to',
+    modalTitle: isHr ? 'Dodaj osobni unos hrane' : 'Log Personal Food',
+    foodName: isHr ? 'Naziv hrane *' : 'Food Name *',
+    amountReq: isHr ? 'Kolicina *' : 'Amount *',
+    reactionStatus: isHr ? 'Status reakcije *' : 'Reaction Status *',
+    notes: isHr ? 'Biljeske (opcionalno)' : 'Notes (Optional)',
+    cancel: isHr ? 'Odustani' : 'Cancel',
+    saveFood: isHr ? 'Spremi hranu' : 'Save Food',
+    safeGreen: isHr ? 'Sigurno (zeleno)' : 'Safe (Green)',
+    cautionOrange: isHr ? 'Oprez (narancasto)' : 'Caution (Orange)',
+    triggerRed: isHr ? 'Trigger (crveno)' : 'Trigger (Red)',
+    deleteTitle: isHr ? 'Obrisati ovaj unos hrane?' : 'Delete this food log?',
+    deleteTextA: isHr ? 'Ova radnja se ne moze ponistiti. Brises' : 'This action cannot be undone. You are deleting',
+    deleteTextB: isHr ? 'iz osobnog dnevnika.' : 'from your personal log.',
+    deleteFood: isHr ? 'Obrisi hranu' : 'Delete Food',
+    lowFodmap: isHr ? 'Niski FODMAP' : 'Low FODMAP',
+    highFodmap: isHr ? 'Visoki FODMAP' : 'High FODMAP',
+    safe: isHr ? 'Sigurno' : 'Safe',
+    caution: isHr ? 'Oprez' : 'Caution',
+    trigger: 'Trigger',
+  };
 
   useEffect(() => {
     if (user) {
@@ -48,7 +382,7 @@ export default function FoodHub() {
     const food: LoggedFood = {
       ...newFood,
       id: Date.now().toString(),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
     saveLoggedFoods([food, ...loggedFoods]);
     setIsAddingFood(false);
@@ -61,29 +395,35 @@ export default function FoodHub() {
 
   const confirmDeleteFood = () => {
     if (!deleteCandidateId) return;
-    saveLoggedFoods(loggedFoods.filter(f => f.id !== deleteCandidateId));
+    saveLoggedFoods(loggedFoods.filter((f) => f.id !== deleteCandidateId));
     setDeleteCandidateId(null);
   };
 
-  const filteredDatabase = foods.filter(food => {
-    const matchesSearch = food.name.toLowerCase().includes(searchQuery.toLowerCase());
-    
+  const filteredDatabase = foods.filter((food) => {
+    const query = searchQuery.toLowerCase();
+    const localizedName = localizeFoodName(food, isHr);
+    const localizedCategory = localizeFoodCategory(food, isHr);
+    const matchesSearch =
+      food.name.toLowerCase().includes(query) ||
+      localizedName.toLowerCase().includes(query) ||
+      food.category.toLowerCase().includes(query) ||
+      localizedCategory.toLowerCase().includes(query);
+
     let matchesFilter = false;
     if (food.fodmapLevel === 'low' && filterLow) matchesFilter = true;
     if (food.fodmapLevel === 'caution' && filterCaution) matchesFilter = true;
     if (food.fodmapLevel === 'high' && filterHigh) matchesFilter = true;
-    
-    // If all filters are off, show nothing (or show all? Usually show nothing if they unchecked all)
-    if (!filterLow && !filterCaution && !filterHigh) return false;
 
+    if (!filterLow && !filterCaution && !filterHigh) return false;
     return matchesSearch && matchesFilter;
   });
 
-  const filteredLog = loggedFoods.filter(food => 
+  const filteredLog = loggedFoods.filter((food) =>
     food.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (food.notes && food.notes.toLowerCase().includes(searchQuery.toLowerCase()))
   );
-  const deleteCandidate = loggedFoods.find(food => food.id === deleteCandidateId);
+
+  const deleteCandidate = loggedFoods.find((food) => food.id === deleteCandidateId);
 
   const getBadgeConfig = (level: FoodItem['fodmapLevel']) => {
     switch (level) {
@@ -93,7 +433,7 @@ export default function FoodHub() {
           color: 'text-emerald-400',
           bg: 'bg-emerald-500/10',
           border: 'border-emerald-500/20',
-          label: 'Low FODMAP'
+          label: copy.lowFodmap,
         };
       case 'caution':
         return {
@@ -101,7 +441,7 @@ export default function FoodHub() {
           color: 'text-amber-400',
           bg: 'bg-amber-500/10',
           border: 'border-amber-500/20',
-          label: 'Caution / Portion'
+          label: copy.cautionPortion,
         };
       case 'high':
         return {
@@ -109,7 +449,7 @@ export default function FoodHub() {
           color: 'text-red-400',
           bg: 'bg-red-500/10',
           border: 'border-red-500/20',
-          label: 'High FODMAP'
+          label: copy.highFodmap,
         };
     }
   };
@@ -117,47 +457,42 @@ export default function FoodHub() {
   const getLogBadgeConfig = (status: LoggedFood['status']) => {
     switch (status) {
       case 'safe':
-        return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', label: 'Safe' };
+        return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', label: copy.safe };
       case 'caution':
-        return { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', label: 'Caution' };
+        return { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', label: copy.caution };
       case 'trigger':
-        return { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', label: 'Trigger' };
+        return { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', label: copy.trigger };
     }
   };
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-3xl font-semibold tracking-tight text-white mb-2">Food Hub</h1>
-        <p className="text-slate-400 max-w-3xl">
-          A low FODMAP diet temporarily reduces certain fermentable carbohydrates to help identify symptom triggers and manage digestive discomfort.
-Use this database during your elimination phase. Low FODMAP is a short-term strategy — gradually reintroduce foods one by one to identify your personal triggers.
-        </p>
-       
+        <h1 className="text-3xl font-semibold tracking-tight text-white mb-2">{copy.title}</h1>
+        <p className="text-slate-400 max-w-3xl">{copy.subtitle}</p>
       </header>
 
-      {/* Tabs & Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800 w-full sm:w-auto shrink-0">
-          <button 
+          <button
             onClick={() => setActiveTab('database')}
             className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'database' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
           >
-            Low FODMAP Database
+            {copy.tabDatabase}
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('log')}
             className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'log' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
           >
-            Personal Food Log
+            {copy.tabLog}
           </button>
         </div>
 
         <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input 
-            type="text" 
-            placeholder={activeTab === 'database' ? "Search foods..." : "Search your log..."}
+          <input
+            type="text"
+            placeholder={activeTab === 'database' ? copy.searchFoods : copy.searchLog}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-slate-900/80 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
@@ -165,22 +500,19 @@ Use this database during your elimination phase. Low FODMAP is a short-term stra
         </div>
       </div>
 
-      {/* Content */}
       {activeTab === 'database' ? (
         <div className="flex flex-col lg:flex-row gap-6 items-start">
-          {/* Mobile Filter Toggle */}
-          <button 
+          <button
             className="lg:hidden w-full bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-center gap-2 text-white font-medium"
             onClick={() => setShowMobileFilters(!showMobileFilters)}
           >
-            Filters
+            {copy.filters}
           </button>
 
-          {/* Filters Sidebar */}
           <div className={`lg:w-64 shrink-0 lg:sticky lg:top-32 ${showMobileFilters ? 'block' : 'hidden lg:block'}`}>
             <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm">
               <h3 className="text-sm font-medium text-slate-300 uppercase tracking-wider mb-4">
-                FODMAP Level
+                {copy.level}
               </h3>
               <div className="space-y-3">
                 <label className="flex items-center gap-3 cursor-pointer group">
@@ -188,15 +520,15 @@ Use this database during your elimination phase. Low FODMAP is a short-term stra
                     {filterLow && <CheckCircle2 className="w-3.5 h-3.5 text-slate-950" />}
                   </div>
                   <input type="checkbox" className="hidden" checked={filterLow} onChange={() => setFilterLow(!filterLow)} />
-                  <span className="text-sm text-slate-300">Low (safe)</span>
+                  <span className="text-sm text-slate-300">{copy.lowSafe}</span>
                 </label>
-                
+
                 <label className="flex items-center gap-3 cursor-pointer group">
                   <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${filterCaution ? 'bg-amber-500 border-amber-500' : 'border-slate-600 group-hover:border-slate-500'}`}>
                     {filterCaution && <CheckCircle2 className="w-3.5 h-3.5 text-slate-950" />}
                   </div>
                   <input type="checkbox" className="hidden" checked={filterCaution} onChange={() => setFilterCaution(!filterCaution)} />
-                  <span className="text-sm text-slate-300">Caution / Portion</span>
+                  <span className="text-sm text-slate-300">{copy.cautionPortion}</span>
                 </label>
 
                 <label className="flex items-center gap-3 cursor-pointer group">
@@ -204,34 +536,35 @@ Use this database during your elimination phase. Low FODMAP is a short-term stra
                     {filterHigh && <CheckCircle2 className="w-3.5 h-3.5 text-slate-950" />}
                   </div>
                   <input type="checkbox" className="hidden" checked={filterHigh} onChange={() => setFilterHigh(!filterHigh)} />
-                  <span className="text-sm text-slate-300">High</span>
+                  <span className="text-sm text-slate-300">{copy.high}</span>
                 </label>
               </div>
             </div>
           </div>
 
-          {/* Grid */}
           <div className="flex-1 w-full">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filteredDatabase.map(food => {
+              {filteredDatabase.map((food) => {
                 const badge = getBadgeConfig(food.fodmapLevel);
+                const localizedName = localizeFoodName(food, isHr);
+                const localizedCategory = localizeFoodCategory(food, isHr);
                 return (
                   <div key={food.id} className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm hover:bg-slate-900/60 transition-colors flex flex-col">
                     <div className="flex justify-between items-start mb-3">
                       <div>
-                        <h3 className="text-lg font-medium text-white">{food.name}</h3>
-                        <p className="text-xs text-slate-500">{food.category}</p>
+                        <h3 className="text-lg font-medium text-white">{localizedName}</h3>
+                        <p className="text-xs text-slate-500">{localizedCategory}</p>
                       </div>
                       <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium ${badge.bg} ${badge.color} ${badge.border}`}>
                         {badge.icon}
                         {badge.label}
                       </div>
                     </div>
-                    
+
                     <div className="mt-auto space-y-2">
                       {food.limitText && (
                         <div className={`text-sm font-medium ${food.fodmapLevel === 'low' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                          Limit to: {food.limitText}
+                          {copy.limitTo}: {food.limitText}
                         </div>
                       )}
 
@@ -248,7 +581,7 @@ Use this database during your elimination phase. Low FODMAP is a short-term stra
 
             {filteredDatabase.length === 0 && (
               <div className="text-center py-12">
-                <p className="text-slate-400">No foods found matching your filters.</p>
+                <p className="text-slate-400">{copy.noFoods}</p>
               </div>
             )}
           </div>
@@ -256,34 +589,34 @@ Use this database during your elimination phase. Low FODMAP is a short-term stra
       ) : (
         <>
           <div className="flex justify-end mb-4">
-            <button 
+            <button
               onClick={() => setIsAddingFood(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
             >
-              <Plus className="w-4 h-4" /> Add Food
+              <Plus className="w-4 h-4" /> {copy.addFood}
             </button>
           </div>
 
           {filteredLog.length === 0 ? (
             <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-12 text-center">
-              <p className="text-slate-400">No foods logged yet. Add your first food.</p>
+              <p className="text-slate-400">{copy.noLogs}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filteredLog.map(food => {
+              {filteredLog.map((food) => {
                 const badge = getLogBadgeConfig(food.status);
                 return (
                   <div key={food.id} className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm flex flex-col group">
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <h3 className="text-lg font-medium text-white">{food.name}</h3>
-                        <p className="text-xs text-slate-500">{new Date(food.createdAt).toLocaleDateString()}</p>
+                        <p className="text-xs text-slate-500">{new Date(food.createdAt).toLocaleDateString(isHr ? 'hr-HR' : 'en-US')}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className={`px-2.5 py-1 rounded-md border text-xs font-medium ${badge.bg} ${badge.color} ${badge.border}`}>
                           {badge.label}
                         </div>
-                        <button 
+                        <button
                           onClick={() => handleDeleteFood(food.id)}
                           className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
                         >
@@ -291,10 +624,10 @@ Use this database during your elimination phase. Low FODMAP is a short-term stra
                         </button>
                       </div>
                     </div>
-                    
+
                     <div className="mt-auto space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-slate-400">Amount:</span>
+                        <span className="text-slate-400">{copy.amount}:</span>
                         <span className="text-slate-200 font-medium">{food.amount}</span>
                       </div>
                       {food.notes && (
@@ -311,70 +644,69 @@ Use this database during your elimination phase. Low FODMAP is a short-term stra
         </>
       )}
 
-      {/* Add Food Modal */}
       {isAddingFood && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl">
             <div className="p-6 border-b border-slate-800">
-              <h2 className="text-xl font-medium text-white">Log Personal Food</h2>
+              <h2 className="text-xl font-medium text-white">{copy.modalTitle}</h2>
             </div>
             <form onSubmit={handleAddFood} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Food Name *</label>
-                <input 
-                  type="text" 
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">{copy.foodName}</label>
+                <input
+                  type="text"
                   required
                   value={newFood.name}
-                  onChange={e => setNewFood({...newFood, name: e.target.value})}
+                  onChange={(e) => setNewFood({ ...newFood, name: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500"
-                  placeholder="e.g., Avocado"
+                  placeholder={isHr ? 'npr. Avokado' : 'e.g., Avocado'}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Amount *</label>
-                <input 
-                  type="text" 
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">{copy.amountReq}</label>
+                <input
+                  type="text"
                   required
                   value={newFood.amount}
-                  onChange={e => setNewFood({...newFood, amount: e.target.value})}
+                  onChange={(e) => setNewFood({ ...newFood, amount: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500"
-                  placeholder="e.g., 1/4 whole, 20g"
+                  placeholder={isHr ? 'npr. 1/4 komada, 20g' : 'e.g., 1/4 whole, 20g'}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Reaction Status *</label>
-                <select 
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">{copy.reactionStatus}</label>
+                <select
                   value={newFood.status}
-                  onChange={e => setNewFood({...newFood, status: e.target.value as any})}
+                  onChange={(e) => setNewFood({ ...newFood, status: e.target.value as 'safe' | 'caution' | 'trigger' })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                 >
-                  <option value="safe">Safe (Green)</option>
-                  <option value="caution">Caution (Orange)</option>
-                  <option value="trigger">Trigger (Red)</option>
+                  <option value="safe">{copy.safeGreen}</option>
+                  <option value="caution">{copy.cautionOrange}</option>
+                  <option value="trigger">{copy.triggerRed}</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Notes (Optional)</label>
-                <textarea 
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">{copy.notes}</label>
+                <textarea
                   value={newFood.notes}
-                  onChange={e => setNewFood({...newFood, notes: e.target.value})}
+                  onChange={(e) => setNewFood({ ...newFood, notes: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500 min-h-[80px]"
-                  placeholder="e.g., Felt bloated 2 hours later"
+                  placeholder={isHr ? 'npr. Nadutost 2 sata kasnije' : 'e.g., Felt bloated 2 hours later'}
                 />
               </div>
               <div className="flex justify-end gap-3 pt-4">
-                <button 
+                <button
                   type="button"
                   onClick={() => setIsAddingFood(false)}
                   className="px-4 py-2 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors"
                 >
-                  Cancel
+                  {copy.cancel}
                 </button>
-                <button 
+                <button
                   type="submit"
                   className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl text-sm font-medium transition-colors"
                 >
-                  Save Food
+                  {copy.saveFood}
                 </button>
               </div>
             </form>
@@ -390,10 +722,11 @@ Use this database during your elimination phase. Low FODMAP is a short-term stra
                 <Trash2 className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-lg font-medium text-white">Delete this food log?</h3>
+                <h3 className="text-lg font-medium text-white">{copy.deleteTitle}</h3>
                 <p className="text-sm text-slate-400 mt-2">
-                  This action cannot be undone. You are deleting{' '}
-                  <span className="text-slate-200">{deleteCandidate.name}</span> from your personal log.
+                  {copy.deleteTextA}{' '}
+                  <span className="text-slate-200">{deleteCandidate.name}</span>{' '}
+                  {copy.deleteTextB}
                 </p>
               </div>
             </div>
@@ -403,13 +736,13 @@ Use this database during your elimination phase. Low FODMAP is a short-term stra
                 onClick={() => setDeleteCandidateId(null)}
                 className="px-4 py-2 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors cursor-pointer"
               >
-                Cancel
+                {copy.cancel}
               </button>
               <button
                 onClick={confirmDeleteFood}
                 className="px-4 py-2 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition-colors cursor-pointer"
               >
-                Delete Food
+                {copy.deleteFood}
               </button>
             </div>
           </div>

@@ -6,6 +6,7 @@
 import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { LanguageProvider } from './context/LanguageContext';
 import Landing from './pages/Landing';
 
 const Layout = React.lazy(() => import('./components/Layout'));
@@ -75,10 +76,11 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-     <Router basename={import.meta.env.BASE_URL}>
-    <AppRoutes />
-  </Router>
-
+      <LanguageProvider>
+        <Router basename={import.meta.env.BASE_URL}>
+          <AppRoutes />
+        </Router>
+      </LanguageProvider>
     </AuthProvider>
   );
 }

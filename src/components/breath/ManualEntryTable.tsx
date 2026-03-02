@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { BreathDataPoint, BreathTest } from '../../types/breathTest';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface ManualEntryTableProps {
   initialData?: BreathDataPoint[] | null;
@@ -9,6 +10,7 @@ interface ManualEntryTableProps {
 }
 
 export default function ManualEntryTable({ initialData, onSave, onCancel }: ManualEntryTableProps) {
+  const { isHr } = useLanguage();
   const [substrate, setSubstrate] = useState<'glucose' | 'lactulose' | 'unknown'>('lactulose');
   const [notes, setNotes] = useState('');
   const [testDate, setTestDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -23,6 +25,20 @@ export default function ManualEntryTable({ initialData, onSave, onCancel }: Manu
       setDataPoints(initialData);
     }
   }, [initialData]);
+
+  const copy = {
+    substrate: isHr ? 'Supstrat' : 'Substrate',
+    lactulose: isHr ? 'Laktuloza' : 'Lactulose',
+    glucose: isHr ? 'Glukoza' : 'Glucose',
+    unknown: isHr ? 'Nepoznato' : 'Unknown',
+    testDate: isHr ? 'Datum testa' : 'Test Date',
+    notesOptional: isHr ? 'Biljeske (opcionalno)' : 'Notes (Optional)',
+    notesPlaceholder: isHr ? 'npr. Post 12 sati' : 'e.g., Fasted for 12 hours',
+    minute: isHr ? 'Minuta' : 'Minute',
+    addRow: isHr ? 'Dodaj red' : 'Add Row',
+    cancel: isHr ? 'Odustani' : 'Cancel',
+    saveTest: isHr ? 'Spremi test' : 'Save Test',
+  };
 
   const handleAddRow = () => {
     const lastMinute = dataPoints.length > 0 ? dataPoints[dataPoints.length - 1].minute : 0;
@@ -58,19 +74,19 @@ export default function ManualEntryTable({ initialData, onSave, onCancel }: Manu
     <form onSubmit={handleSubmit} className="flex flex-col h-full">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">Substrate</label>
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">{copy.substrate}</label>
           <select 
             value={substrate}
             onChange={(e) => setSubstrate(e.target.value as any)}
             className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
           >
-            <option value="lactulose">Lactulose</option>
-            <option value="glucose">Glucose</option>
-            <option value="unknown">Unknown</option>
+            <option value="lactulose">{copy.lactulose}</option>
+            <option value="glucose">{copy.glucose}</option>
+            <option value="unknown">{copy.unknown}</option>
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">Test Date</label>
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">{copy.testDate}</label>
           <input
             type="date"
             value={testDate}
@@ -79,13 +95,13 @@ export default function ManualEntryTable({ initialData, onSave, onCancel }: Manu
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">Notes (Optional)</label>
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">{copy.notesOptional}</label>
           <input 
             type="text" 
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-            placeholder="e.g., Fasted for 12 hours"
+            placeholder={copy.notesPlaceholder}
           />
         </div>
       </div>
@@ -94,7 +110,7 @@ export default function ManualEntryTable({ initialData, onSave, onCancel }: Manu
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-800 bg-slate-900/50">
-              <th className="p-3 text-xs font-medium text-slate-400 font-mono uppercase tracking-wider">Minute</th>
+              <th className="p-3 text-xs font-medium text-slate-400 font-mono uppercase tracking-wider">{copy.minute}</th>
               <th className="p-3 text-xs font-medium text-slate-400 font-mono uppercase tracking-wider">H2 (ppm)</th>
               <th className="p-3 text-xs font-medium text-slate-400 font-mono uppercase tracking-wider">CH4 (ppm)</th>
               <th className="p-3 text-xs font-medium text-slate-400 font-mono uppercase tracking-wider w-12"></th>
@@ -154,7 +170,7 @@ export default function ManualEntryTable({ initialData, onSave, onCancel }: Manu
         onClick={handleAddRow}
         className="flex items-center gap-2 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors mb-8 w-fit"
       >
-        <Plus className="w-4 h-4" /> Add Row
+        <Plus className="w-4 h-4" /> {copy.addRow}
       </button>
 
       {/* Sticky Footer */}
@@ -164,13 +180,13 @@ export default function ManualEntryTable({ initialData, onSave, onCancel }: Manu
           onClick={onCancel}
           className="px-4 py-2 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors"
         >
-          Cancel
+          {copy.cancel}
         </button>
         <button 
           type="submit"
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl text-sm font-medium transition-colors shadow-lg shadow-blue-900/20"
         >
-          Save Test
+          {copy.saveTest}
         </button>
       </div>
     </form>

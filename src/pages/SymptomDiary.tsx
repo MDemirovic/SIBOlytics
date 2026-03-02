@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { SymptomDiaryEntry } from '../types/symptomDiary';
 import { getLocalDateKey, loadSymptomDiary, saveSymptomDiary } from '../utils/symptomDiaryStorage';
 
@@ -18,14 +19,14 @@ type SymptomFormState = Record<SymptomFieldKey, number> & {
   notes: string;
 };
 
-const SYMPTOM_FIELDS: Array<{ key: SymptomFieldKey; label: string }> = [
-  { key: 'pain', label: 'Stomach Pain' },
-  { key: 'stress', label: 'Stress' },
-  { key: 'sleep', label: 'Sleep' },
-  { key: 'stool', label: 'Stool' },
-  { key: 'bloating', label: 'Bloating' },
-  { key: 'diarrhea', label: 'Diarrhea' },
-  { key: 'energy', label: 'Energy' },
+const SYMPTOM_FIELDS: SymptomFieldKey[] = [
+  'pain',
+  'stress',
+  'sleep',
+  'stool',
+  'bloating',
+  'diarrhea',
+  'energy',
 ];
 
 const EMPTY_FORM: SymptomFormState = {
@@ -40,8 +41,8 @@ const EMPTY_FORM: SymptomFormState = {
   notes: '',
 };
 
-function formatDate(date: string) {
-  return new Date(`${date}T00:00:00`).toLocaleDateString('hr-HR');
+function formatDate(date: string, isHr: boolean) {
+  return new Date(`${date}T00:00:00`).toLocaleDateString(isHr ? 'hr-HR' : 'en-US');
 }
 
 function mapEntryToForm(entry: SymptomDiaryEntry): SymptomFormState {
@@ -59,13 +60,14 @@ function mapEntryToForm(entry: SymptomDiaryEntry): SymptomFormState {
 }
 
 function calculateOverall(form: Pick<SymptomFormState, SymptomFieldKey>): number {
-  const total = SYMPTOM_FIELDS.reduce((sum, field) => sum + form[field.key], 0);
+  const total = SYMPTOM_FIELDS.reduce((sum, field) => sum + form[field], 0);
   return Math.round(total / SYMPTOM_FIELDS.length);
 }
 
 function sliderBadgeClass(value: number) {
   if (value <= 3) return 'text-red-300 border-red-500/30 bg-red-500/10';
-  if (value <= 7) return 'text-amber-300 border-amber-500/30 bg-amber-500/10';
+  if (value <= 6) return 'text-amber-300 border-amber-500/30 bg-amber-500/10';
+  if (value === 7) return 'text-emerald-200 border-emerald-500/20 bg-emerald-500/5';
   return 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10';
 }
 
@@ -101,6 +103,7 @@ function SymptomSlider({
 
 export default function SymptomDiary() {
   const { user } = useAuth();
+  const { isHr } = useLanguage();
   const [entries, setEntries] = useState<SymptomDiaryEntry[]>([]);
   const [todayKey, setTodayKey] = useState<string>(getLocalDateKey());
   const [entryDate, setEntryDate] = useState<string>(getLocalDateKey());
@@ -110,6 +113,51 @@ export default function SymptomDiary() {
   const [historyQuery, setHistoryQuery] = useState('');
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const previousTodayKeyRef = useRef(todayKey);
+
+  const copy = {
+    loginPrompt: isHr ? 'Prijavi se za koristenje Dnevnika simptoma.' : 'Sign in to use Symptom Diary.',
+    todayIs: isHr ? 'Danas je' : 'Today is',
+    editingToday: isHr ? 'Trenutno uredjujes danas. Moguc je samo jedan unos dnevno.' : 'You are currently editing today. One entry per day is enforced.',
+    viewingDay: isHr ? 'Pregledavas' : 'You are viewing',
+    returnToday: isHr ? 'Klikni "Danas" za povratak.' : 'Click "Today" to return.',
+    today: isHr ? 'Danas' : 'Today',
+    savedEntries: isHr ? 'Spremljeni dnevni unosi' : 'Saved Daily Entries',
+    total: isHr ? 'ukupno' : 'total',
+    searchByDate: isHr ? 'Pretrazi po datumu...' : 'Search by date...',
+    noEntries: isHr ? 'Jos nema unosa. Klikni "Danas" i spremi simptome.' : 'No entries yet. Click "Today" and save symptoms.',
+    noMatches: isHr ? 'Nema unosa koji odgovaraju pretrazi.' : 'No saved entries match your search.',
+    selectedDay: isHr ? 'Odabrani dan' : 'Selected logged day',
+    clickCard: isHr ? 'Klikni karticu iznad za ucitavanje u editor.' : 'Click the card above to load it into the editor.',
+    pain: isHr ? 'Bol' : 'Pain',
+    stress: isHr ? 'Stres' : 'Stress',
+    energy: isHr ? 'Energija' : 'Energy',
+    titleToday: isHr ? 'Danasnji simptomi' : "Today's Symptoms",
+    titleDaily: isHr ? 'Dnevni simptomi' : 'Daily Symptoms',
+    titleAdd: isHr ? 'Dodaj simptome' : 'Add symptoms',
+    scaleText: isHr ? '1 je najgore (crveno), 10 je najbolje (zeleno). Spremi za novi unos ili azuriranje dana.' : '1 is worst (red), 10 is best (green). Save to create or update this day.',
+    overall: isHr ? 'Izracunati ukupni dan' : 'Calculated overall day',
+    notes: isHr ? 'Biljeske' : 'Notes',
+    notesPlaceholder: isHr ? 'Opcionalne biljeske...' : 'Optional notes...',
+    delete: isHr ? 'Obrisi' : 'Delete',
+    saving: isHr ? 'Spremanje...' : 'Saving...',
+    updateToday: isHr ? 'Azuriraj danas' : 'Update Today',
+    updateDay: isHr ? 'Azuriraj odabrani dan' : 'Update Selected Day',
+    saveToday: isHr ? 'Spremi danas' : 'Save Today',
+    saveDay: isHr ? 'Spremi odabrani dan' : 'Save Selected Day',
+    savedFor: isHr ? 'Spremljeno za' : 'Saved for',
+    at: isHr ? 'u' : 'at',
+    deletedFor: isHr ? 'Obrisan unos za' : 'Deleted entry for',
+  };
+
+  const fieldLabels: Record<SymptomFieldKey, string> = {
+    pain: isHr ? 'Bol u trbuhu' : 'Stomach Pain',
+    stress: isHr ? 'Stres' : 'Stress',
+    sleep: isHr ? 'San' : 'Sleep',
+    stool: isHr ? 'Stolica' : 'Stool',
+    bloating: isHr ? 'Nadutost' : 'Bloating',
+    diarrhea: isHr ? 'Proljev' : 'Diarrhea',
+    energy: isHr ? 'Energija' : 'Energy',
+  };
 
   const entryTarget = useMemo(
     () => entries.find((entry) => entry.date === entryDate) ?? null,
@@ -123,10 +171,10 @@ export default function SymptomDiary() {
     const query = historyQuery.trim().toLowerCase();
     if (!query) return sortedEntries;
     return sortedEntries.filter((entry) => {
-      const label = formatDate(entry.date).toLowerCase();
+      const label = formatDate(entry.date, isHr).toLowerCase();
       return label.includes(query) || entry.date.includes(query);
     });
-  }, [sortedEntries, historyQuery]);
+  }, [sortedEntries, historyQuery, isHr]);
   const selectedHistoryEntry = useMemo(
     () => entries.find((entry) => entry.id === selectedHistoryId) ?? null,
     [entries, selectedHistoryId]
@@ -180,7 +228,7 @@ export default function SymptomDiary() {
     saveSymptomDiary(nextEntries, user?.id);
   };
 
-  const handleAddDailySymptoms = () => {
+  const handleGoToToday = () => {
     setEntryDate(todayKey);
     const todayEntry = entries.find((entry) => entry.date === todayKey);
     setSelectedHistoryId(todayEntry?.id ?? selectedHistoryId);
@@ -225,7 +273,7 @@ export default function SymptomDiary() {
     persistEntries(updated);
     setSelectedHistoryId(nextEntry.id);
     setSaveFeedback(
-      `Saved for ${formatDate(nextEntry.date)} at ${new Date().toLocaleTimeString([], {
+      `${copy.savedFor} ${formatDate(nextEntry.date, isHr)} ${copy.at} ${new Date().toLocaleTimeString([], {
         hour: '2-digit',
         minute: '2-digit',
       })}.`
@@ -239,13 +287,13 @@ export default function SymptomDiary() {
     const updated = entries.filter((entry) => entry.date !== entryDate);
     persistEntries(updated);
     setSelectedHistoryId(updated[0]?.id ?? null);
-    setSaveFeedback(`Deleted entry for ${formatDate(deletedDate)}.`);
+    setSaveFeedback(`${copy.deletedFor} ${formatDate(deletedDate, isHr)}.`);
   };
 
   if (!user) {
     return (
       <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 text-sm text-slate-300">
-        Sign in to use Symptom Diary.
+        {copy.loginPrompt}
       </div>
     );
   }
@@ -286,19 +334,21 @@ export default function SymptomDiary() {
       <section className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 md:p-5 backdrop-blur-sm">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-slate-200">Today is {formatDate(todayKey)}</p>
+            <p className="text-sm font-medium text-slate-200">
+              {copy.todayIs} {formatDate(todayKey, isHr)}
+            </p>
             <p className="mt-1 text-xs text-slate-400">
               {entryDate === todayKey
-                ? 'You are currently editing today. One entry per day is enforced.'
-                : `You are viewing ${formatDate(entryDate)}. Click "Add Daily Symptoms" to return to today.`}
+                ? copy.editingToday
+                : `${copy.viewingDay} ${formatDate(entryDate, isHr)}. ${copy.returnToday}`}
             </p>
           </div>
           <button
             type="button"
-            onClick={handleAddDailySymptoms}
+            onClick={handleGoToToday}
             className="px-3 py-2 rounded-xl text-xs font-medium border border-slate-700 text-slate-200 hover:bg-slate-800 transition-colors w-fit"
           >
-            Go to Today
+            {copy.today}
           </button>
         </div>
       </section>
@@ -307,19 +357,19 @@ export default function SymptomDiary() {
         <div className="hidden xl:block xl:col-span-4">
           <div className="bg-slate-900/30 border border-slate-800 rounded-2xl p-4 backdrop-blur-sm">
             <div className="flex items-center justify-between gap-2 mb-3">
-              <h3 className="text-sm font-medium text-slate-200">Saved Daily Entries</h3>
-              <span className="text-[11px] text-slate-500">{entries.length} total</span>
+              <h3 className="text-sm font-medium text-slate-200">{copy.savedEntries}</h3>
+              <span className="text-[11px] text-slate-500">{entries.length} {copy.total}</span>
             </div>
             <input
               type="text"
               value={historyQuery}
               onChange={(event) => setHistoryQuery(event.target.value)}
-              placeholder="Search by date..."
+              placeholder={copy.searchByDate}
               className="w-full mb-3 bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
             />
             {entries.length === 0 ? (
               <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 text-sm text-slate-400">
-                No entries yet. Click &quot;Add Daily Symptoms&quot; to log today.
+                {copy.noEntries}
               </div>
             ) : (
               <div className="space-y-3">
@@ -333,23 +383,23 @@ export default function SymptomDiary() {
                         : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'
                     }`}
                   >
-                    <p className="text-sm font-medium text-white">{formatDate(entry.date)}</p>
+                    <p className="text-sm font-medium text-white">{formatDate(entry.date, isHr)}</p>
                     <p className="text-xs text-slate-400 mt-2">
-                      Pain {entry.pain}/10 - Stress {entry.stress}/10 - Energy {entry.energy}/10
+                      {copy.pain} {entry.pain}/10 - {copy.stress} {entry.stress}/10 - {copy.energy} {entry.energy}/10
                     </p>
                   </button>
                 ))}
                 {filteredHistoryEntries.length === 0 && (
                   <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 text-sm text-slate-400">
-                    No saved entries match your search.
+                    {copy.noMatches}
                   </div>
                 )}
                 {selectedHistoryEntry && entryDate !== selectedHistoryEntry.date && (
                   <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 mt-4">
-                    <p className="text-xs text-slate-400 mb-2">Selected logged day</p>
-                    <p className="text-sm font-medium text-white">{formatDate(selectedHistoryEntry.date)}</p>
+                    <p className="text-xs text-slate-400 mb-2">{copy.selectedDay}</p>
+                    <p className="text-sm font-medium text-white">{formatDate(selectedHistoryEntry.date, isHr)}</p>
                     <p className="text-xs text-slate-400 mt-2">
-                      Click the card above to load it into the editor.
+                      {copy.clickCard}
                     </p>
                   </div>
                 )}
@@ -360,28 +410,28 @@ export default function SymptomDiary() {
 
         <div className="xl:col-span-8 space-y-6">
           <section className="bg-linear-to-br from-blue-900/20 to-slate-900/40 border border-blue-900/30 rounded-2xl p-6 md:p-7 backdrop-blur-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
-                  <Activity className="w-4 h-4 text-blue-400" />
-                </div>
-                <h2 className="text-lg font-medium text-white">
-                  {entryTarget
-                    ? `${entryDate === todayKey ? "Today's Symptoms" : 'Daily Symptoms'} - ${formatDate(entryDate)}`
-                    : `Add ${entryDate === todayKey ? "Today's " : ''}Symptoms - ${formatDate(entryDate)}`}
-                </h2>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
+                <Activity className="w-4 h-4 text-blue-400" />
               </div>
-              <p className="text-xs text-slate-400 mb-5">
-              1 is worst (red), 10 is best (green). Save to create or update this day.
+              <h2 className="text-lg font-medium text-white">
+                {entryTarget
+                  ? `${entryDate === todayKey ? copy.titleToday : copy.titleDaily} - ${formatDate(entryDate, isHr)}`
+                  : `${copy.titleAdd} - ${formatDate(entryDate, isHr)}`}
+              </h2>
+            </div>
+            <p className="text-xs text-slate-400 mb-5">
+              {copy.scaleText}
             </p>
 
             <form onSubmit={handleSave} className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {SYMPTOM_FIELDS.map((field) => (
-                  <div key={field.key}>
+                  <div key={field}>
                     <SymptomSlider
-                      label={field.label}
-                      value={form[field.key]}
-                      onChange={(value) => updateFormScore(field.key, value)}
+                      label={fieldLabels[field]}
+                      value={form[field]}
+                      onChange={(value) => updateFormScore(field, value)}
                     />
                   </div>
                 ))}
@@ -389,7 +439,7 @@ export default function SymptomDiary() {
 
               <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-slate-300">Calculated overall day</p>
+                  <p className="text-sm text-slate-300">{copy.overall}</p>
                   <span className={`text-xs px-2 py-1 rounded-md border font-medium ${sliderBadgeClass(form.overallGut)}`}>
                     {form.overallGut}/10
                   </span>
@@ -397,12 +447,12 @@ export default function SymptomDiary() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Notes</label>
+                <label className="block text-sm font-medium text-slate-300 mb-2">{copy.notes}</label>
                 <textarea
                   value={form.notes}
                   onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
                   className="w-full min-h-[100px] bg-slate-950/80 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
-                  placeholder="Optional notes..."
+                  placeholder={copy.notesPlaceholder}
                 />
               </div>
 
@@ -414,7 +464,7 @@ export default function SymptomDiary() {
                     className="px-4 py-2 rounded-xl text-sm font-medium bg-red-600/15 border border-red-500/30 text-red-300 hover:bg-red-600/25 transition-colors flex items-center gap-2"
                   >
                     <Trash2 className="w-4 h-4" />
-                    Delete
+                    {copy.delete}
                   </button>
                 )}
                 <button
@@ -423,14 +473,14 @@ export default function SymptomDiary() {
                   className="cursor-pointer px-5 py-2 rounded-xl text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed text-white transition-colors"
                 >
                   {isSaving
-                    ? 'Saving...'
+                    ? copy.saving
                     : entryTarget
                       ? entryDate === todayKey
-                        ? 'Update Today'
-                        : 'Update Selected Day'
+                        ? copy.updateToday
+                        : copy.updateDay
                       : entryDate === todayKey
-                        ? 'Save Today'
-                        : 'Save Selected Day'}
+                        ? copy.saveToday
+                        : copy.saveDay}
                 </button>
               </div>
 
@@ -442,19 +492,19 @@ export default function SymptomDiary() {
 
           <section className="xl:hidden bg-slate-900/30 border border-slate-800 rounded-2xl p-4 backdrop-blur-sm">
             <div className="flex items-center justify-between gap-2 mb-3">
-              <h3 className="text-sm font-medium text-slate-200">Saved Daily Entries</h3>
-              <span className="text-[11px] text-slate-500">{entries.length} total</span>
+              <h3 className="text-sm font-medium text-slate-200">{copy.savedEntries}</h3>
+              <span className="text-[11px] text-slate-500">{entries.length} {copy.total}</span>
             </div>
             <input
               type="text"
               value={historyQuery}
               onChange={(event) => setHistoryQuery(event.target.value)}
-              placeholder="Search by date..."
+              placeholder={copy.searchByDate}
               className="w-full mb-3 bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
             />
             {entries.length === 0 ? (
               <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 text-sm text-slate-400">
-                No entries yet.
+                {copy.noEntries}
               </div>
             ) : (
               <div className="space-y-3">
@@ -468,23 +518,23 @@ export default function SymptomDiary() {
                         : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'
                     }`}
                   >
-                    <p className="text-sm font-medium text-white">{formatDate(entry.date)}</p>
+                    <p className="text-sm font-medium text-white">{formatDate(entry.date, isHr)}</p>
                     <p className="text-xs text-slate-400 mt-2">
-                      Pain {entry.pain}/10 - Stress {entry.stress}/10 - Energy {entry.energy}/10
+                      {copy.pain} {entry.pain}/10 - {copy.stress} {entry.stress}/10 - {copy.energy} {entry.energy}/10
                     </p>
                   </button>
                 ))}
                 {filteredHistoryEntries.length === 0 && (
                   <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 text-sm text-slate-400">
-                    No saved entries match your search.
+                    {copy.noMatches}
                   </div>
                 )}
                 {selectedHistoryEntry && entryDate !== selectedHistoryEntry.date && (
                   <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 mt-4">
-                    <p className="text-xs text-slate-400 mb-2">Selected logged day</p>
-                    <p className="text-sm font-medium text-white">{formatDate(selectedHistoryEntry.date)}</p>
+                    <p className="text-xs text-slate-400 mb-2">{copy.selectedDay}</p>
+                    <p className="text-sm font-medium text-white">{formatDate(selectedHistoryEntry.date, isHr)}</p>
                     <p className="text-xs text-slate-400 mt-2">
-                      Click the card above to load it into the editor.
+                      {copy.clickCard}
                     </p>
                   </div>
                 )}

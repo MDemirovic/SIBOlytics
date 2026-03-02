@@ -30,7 +30,7 @@ export default function Education() {
           <h1 className="text-3xl font-semibold tracking-tight text-white">SIBO Guide</h1>
         </div>
         <p className="text-slate-400 max-w-3xl">
-          A structured, evidence-based overview of Small Intestinal Bacterial Overgrowth (SIBO) and related conditions based on Mark Pimentel 2026 research.
+          A structured, evidence-based overview of Small Intestinal Bacterial Overgrowth (SIBO) and related conditions based on Pimentel-led and consensus literature.
         </p>
       </header>
 
@@ -117,6 +117,26 @@ export default function Education() {
                       <FileText className="w-4 h-4 shrink-0 text-slate-400" />
                       <span>{section.evidenceNote}</span>
                     </div>
+
+                    {section.optionalLinks && section.optionalLinks.length > 0 && (
+                      <div className="mt-3 rounded-lg border border-slate-800/50 bg-slate-950/40 p-3">
+                        <p className="text-xs font-medium text-slate-400 mb-2">Key references</p>
+                        <ul className="space-y-1.5">
+                          {section.optionalLinks.map((link) => (
+                            <li key={link.url}>
+                              <a
+                                href={link.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs text-blue-300 hover:text-blue-200 underline underline-offset-2"
+                              >
+                                {link.label}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -132,11 +152,15 @@ export default function Education() {
             <ul className="space-y-2 text-sm text-slate-400">
               <li className="flex items-center gap-2">
                 <div className="w-1 h-1 rounded-full bg-slate-600" />
-                DR. Mark Pimentel 2026 SIBO Research
+                North American Consensus on Breath Testing (2017)
               </li>
               <li className="flex items-center gap-2">
                 <div className="w-1 h-1 rounded-full bg-slate-600" />
-                NIH Knowledge Base
+                ACG Clinical Guideline: Small Intestinal Bacterial Overgrowth (2020)
+              </li>
+              <li className="flex items-center gap-2">
+                <div className="w-1 h-1 rounded-full bg-slate-600" />
+                Pimentel et al. methane and gut transit data (2006+)
               </li>
             </ul>
           </div>

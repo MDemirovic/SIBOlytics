@@ -17,6 +17,7 @@ import {
 } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { BreathTest } from '../types/breathTest';
 import { SymptomDiaryEntry } from '../types/symptomDiary';
 import { getLocalDateKey, getSymptomDiaryStorageKey, loadSymptomDiary } from '../utils/symptomDiaryStorage';
@@ -35,8 +36,8 @@ function getDateSequence(days: number): string[] {
   return list;
 }
 
-function getDayLabel(date: string) {
-  return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short' });
+function getDayLabel(date: string, language: 'en' | 'hr') {
+  return new Date(`${date}T00:00:00`).toLocaleDateString(language === 'hr' ? 'hr-HR' : 'en-US', { weekday: 'short' });
 }
 
 function MetricCard({
@@ -44,13 +45,11 @@ function MetricCard({
   value,
   subtitle,
   icon,
-  trend,
 }: {
   title: string;
   value: string;
   subtitle: string;
   icon: React.ReactNode;
-  trend: 'up' | 'down' | 'neutral';
 }) {
   return (
     <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm flex items-start justify-between group hover:border-slate-700 transition-colors">
@@ -73,11 +72,11 @@ function getTestTimestamp(test: BreathTest): number {
   return Number.isNaN(fallback) ? 0 : fallback;
 }
 
-function getLatestBreathTestSummary(tests: BreathTest[]): { value: string; subtitle: string } {
+function getLatestBreathTestSummary(tests: BreathTest[], isHr: boolean): { value: string; subtitle: string } {
   if (tests.length === 0) {
     return {
-      value: 'No Tests Yet',
-      subtitle: 'Add a test in Breath Tests',
+      value: isHr ? 'Nema testova' : 'No Tests Yet',
+      subtitle: isHr ? 'Dodaj test u sekciju Izdisajni testovi' : 'Add a test in Breath Tests',
     };
   }
 
@@ -88,8 +87,8 @@ function getLatestBreathTestSummary(tests: BreathTest[]): { value: string; subti
   const dateLabel = new Date(getTestTimestamp(latest)).toLocaleDateString();
   if (!latest.data || latest.data.length === 0) {
     return {
-      value: 'No Data',
-      subtitle: `${dateLabel} - Empty test data`,
+      value: isHr ? 'Nema podataka' : 'No Data',
+      subtitle: isHr ? `${dateLabel} - Prazni podaci testa` : `${dateLabel} - Empty test data`,
     };
   }
 
@@ -102,25 +101,29 @@ function getLatestBreathTestSummary(tests: BreathTest[]): { value: string; subti
 
   if (isH2Positive && isCH4Positive) {
     return {
-      value: 'Mixed Pattern',
+      value: isHr ? 'Mjesoviti obrazac' : 'Mixed Pattern',
       subtitle: `${dateLabel} - H2 ${peakH2Point.h2}ppm / CH4 ${peakCH4Point.ch4}ppm`,
     };
   }
   if (isH2Positive) {
     return {
-      value: 'H2 Dominant',
-      subtitle: `${dateLabel} - Peak H2 ${peakH2Point.h2}ppm at ${peakH2Point.minute}min`,
+      value: isHr ? 'H2 dominantan' : 'H2 Dominant',
+      subtitle: isHr
+        ? `${dateLabel} - Vrh H2 ${peakH2Point.h2}ppm u ${peakH2Point.minute}. min`
+        : `${dateLabel} - Peak H2 ${peakH2Point.h2}ppm at ${peakH2Point.minute}min`,
     };
   }
   if (isCH4Positive) {
     return {
-      value: 'CH4 Dominant',
-      subtitle: `${dateLabel} - Peak CH4 ${peakCH4Point.ch4}ppm at ${peakCH4Point.minute}min`,
+      value: isHr ? 'CH4 dominantan' : 'CH4 Dominant',
+      subtitle: isHr
+        ? `${dateLabel} - Vrh CH4 ${peakCH4Point.ch4}ppm u ${peakCH4Point.minute}. min`
+        : `${dateLabel} - Peak CH4 ${peakCH4Point.ch4}ppm at ${peakCH4Point.minute}min`,
     };
   }
 
   return {
-    value: 'Normal Pattern',
+    value: isHr ? 'Normalan obrazac' : 'Normal Pattern',
     subtitle: `${dateLabel} - H2 ${peakH2Point.h2}ppm / CH4 ${peakCH4Point.ch4}ppm`,
   };
 }
@@ -128,9 +131,53 @@ function getLatestBreathTestSummary(tests: BreathTest[]): { value: string; subti
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { language, isHr } = useLanguage();
   const [tests, setTests] = useState<BreathTest[]>([]);
   const [diaryEntries, setDiaryEntries] = useState<SymptomDiaryEntry[]>([]);
   const [chartRange, setChartRange] = useState<ChartRange>(7);
+
+  const copy = {
+    todaySymptomScore: isHr ? 'Danasnji rezultat simptoma' : "Today's Symptom Score",
+    logSymptoms: isHr ? 'Upisi simptome u Dnevnik simptoma' : 'Log symptoms in Symptom Diary',
+    mmcReminder: isHr ? 'MMC podsjetnik' : 'MMC Reminder',
+    mmcValue: isHr ? '4h razmak' : '4h Gap',
+    mmcSubtitle: isHr ? 'Pokusaj drzati oko 4h izmedu obroka.' : 'Try to keep around 4h between meals.',
+    lastBreathTest: isHr ? 'Zadnji izdisajni test' : 'Last Breath Test',
+    trendsTitle: isHr ? 'Trend simptoma i stresa' : 'Symptom & Stress Trends',
+    trendsSubtitle: isHr ? `Korelacija zadnjih ${chartRange} dana` : `Past ${chartRange} days correlation`,
+    last7: isHr ? 'Zadnjih 7 dana' : 'Last 7 days',
+    last30: isHr ? 'Zadnjih 30 dana' : 'Last 30 days',
+    chartInfo: isHr
+      ? 'Graf se temelji na dnevnim unosima iz Dnevnika simptoma.'
+      : 'Chart is based on your Symptom Diary daily logs.',
+    chartCta: isHr
+      ? 'Upisi simptome u Dnevnik simptoma kako bi ovdje vidio trendove.'
+      : 'Log symptoms in Symptom Diary to see trends here.',
+    noChartData: isHr
+      ? 'Nema unosa simptoma u ovom periodu. Dodaj dnevne unose za prikaz trenda.'
+      : 'No symptom logs yet in this period. Add diary entries to populate the trend chart.',
+    motivationTitle: isHr ? 'Dnevna SIBO motivacija' : 'Daily SIBO Motivation',
+    motivationText: isHr
+      ? 'Oporavak crijeva je maraton, ne sprint. Male, dosljedne navike poput razmaka izmedu obroka i upravljanja stresom s vremenom cine veliku razliku.'
+      : 'Healing the gut is a marathon, not a sprint. Small, consistent habits like spacing your meals and managing stress make a profound difference over time.',
+    remember: isHr ? 'Zapamti' : 'Remember',
+    rememberText: isHr
+      ? 'Zastoji su normalni. Fokusiraj se na napredak koji si napravio i ostani dosljedan svom planu.'
+      : "Setbacks are normal. Focus on the progress you've made and stay consistent with your plan.",
+    successCta: isHr ? 'SIBO uspjesi' : 'SIBO Success',
+    commonPattern: isHr ? 'Uobicajeni obrazac SIBO simptoma' : 'Common SIBO Symptom Pattern',
+    commonPatternText: isHr
+      ? 'Simptomi cesto variraju zbog vremena obroka, vrste hrane, stresa i kvalitete sna. Pracenje kontinuiteta kroz vrijeme obicno daje jasniji uvid nego promatranje samo jednog dana.'
+      : 'Symptoms often fluctuate by meal timing, food type, stress, and sleep quality. Tracking consistency over time usually gives clearer insight than looking at one isolated day.',
+    frequent: isHr ? 'Cesto' : 'Frequent',
+    frequentText: isHr ? 'Nadutost, plinovi, nelagoda u trbuhu' : 'Bloating, gas, abdominal discomfort',
+    patternClues: isHr ? 'Znakovi obrasca' : 'Pattern Clues',
+    patternCluesText: isHr ? 'Gore nakon trigger hrane ili kracih razmaka izmedu obroka' : 'Worse after trigger foods or shortened meal gaps',
+    todayFocus: isHr ? 'Danasnji fokus' : "Today's Focus",
+    focus1: isHr ? 'Drzi otprilike 4 sata izmedu obroka kad god je moguce.' : 'Keep approximately 4 hours between meals when possible.',
+    focus2: isHr ? 'Dodaj ili pregledaj svoj zadnji izdisajni test u sekciji Izdisajni testovi.' : 'Add or review your most recent breath test in the Breath Tests section.',
+    focus3: isHr ? 'U Food Hubu provjeri jedan sumnjivi sastojak danas.' : 'Use Food Hub to check one suspected trigger ingredient today.',
+  };
 
   useEffect(() => {
     if (!user) {
@@ -163,7 +210,7 @@ export default function Dashboard() {
     return () => window.removeEventListener('storage', onStorage);
   }, [user]);
 
-  const latestBreathTest = useMemo(() => getLatestBreathTestSummary(tests), [tests]);
+  const latestBreathTest = useMemo(() => getLatestBreathTestSummary(tests, isHr), [tests, isHr]);
   const todayKey = useMemo(() => getLocalDateKey(), []);
 
   useEffect(() => {
@@ -194,14 +241,14 @@ export default function Dashboard() {
     if (!todayEntry) {
       return {
         value: '--',
-        subtitle: 'Log symptoms in Symptom Diary',
+        subtitle: copy.logSymptoms,
       };
     }
     return {
       value: `${todayEntry.overallGut}/10`,
       subtitle: `Bloating ${todayEntry.bloating}/10 - Stress ${todayEntry.stress}/10`,
     };
-  }, [todayEntry]);
+  }, [todayEntry, copy.logSymptoms]);
 
   const chartData = useMemo(() => {
     const entryMap = new Map<string, SymptomDiaryEntry>(
@@ -211,12 +258,12 @@ export default function Dashboard() {
       const entry = entryMap.get(date);
       return {
         date,
-        day: getDayLabel(date),
+        day: getDayLabel(date, language),
         bloating: entry?.bloating ?? null,
         stress: entry?.stress ?? null,
       };
     });
-  }, [chartRange, diaryEntries]);
+  }, [chartRange, diaryEntries, language]);
 
   const hasChartData = useMemo(
     () => chartData.some((point) => point.bloating !== null || point.stress !== null),
@@ -225,39 +272,33 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Top Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <MetricCard
-          title="Today's Symptom Score"
+          title={copy.todaySymptomScore}
           value={todaySymptomMetric.value}
           subtitle={todaySymptomMetric.subtitle}
           icon={<Activity className="w-5 h-5 text-emerald-400" />}
-          trend="down"
         />
         <MetricCard
-          title="MMC Reminder"
-          value="4h Gap"
-          subtitle="Try to keep around 4h between meals."
+          title={copy.mmcReminder}
+          value={copy.mmcValue}
+          subtitle={copy.mmcSubtitle}
           icon={<Clock className="w-5 h-5 text-blue-400" />}
-          trend="neutral"
         />
         <MetricCard
-          title="Last Breath Test"
+          title={copy.lastBreathTest}
           value={latestBreathTest.value}
           subtitle={latestBreathTest.subtitle}
           icon={<FileText className="w-5 h-5 text-indigo-400" />}
-          trend="neutral"
         />
       </div>
 
-      {/* Main Chart & Motivation Row */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch min-h-[540px]">
-        {/* Chart Card */}
         <div className="xl:col-span-8 bg-slate-900/40 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-lg font-medium">Symptom & Stress Trends</h2>
-              <p className="text-sm text-slate-400">Past {chartRange} days correlation</p>
+              <h2 className="text-lg font-medium">{copy.trendsTitle}</h2>
+              <p className="text-sm text-slate-400">{copy.trendsSubtitle}</p>
             </div>
             <select
               value={chartRange}
@@ -265,17 +306,17 @@ export default function Dashboard() {
               className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none"
               aria-label="Select time period for symptom trends"
             >
-              <option value={7}>Last 7 days</option>
-              <option value={30}>Last 30 days</option>
+              <option value={7}>{copy.last7}</option>
+              <option value={30}>{copy.last30}</option>
             </select>
           </div>
           <div className="mb-4 text-xs text-slate-400">
-            Chart is based on your Symptom Diary daily logs.{' '}
+            {copy.chartInfo}{' '}
             <button
               onClick={() => navigate('/symptom-diary')}
               className="text-blue-300 hover:text-blue-200 underline underline-offset-2"
             >
-              Log symptoms in Symptom Diary to see trends here.
+              {copy.chartCta}
             </button>
           </div>
           <div className="h-[420px] w-full flex-1">
@@ -288,35 +329,50 @@ export default function Dashboard() {
                   contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px' }}
                   itemStyle={{ color: '#f8fafc' }}
                 />
-                <Line type="monotone" dataKey="bloating" name="Bloating (1-10)" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#0f172a' }} activeDot={{ r: 6 }} />
-                <Line type="monotone" dataKey="stress" name="Stress (1-10)" stroke="#818cf8" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 4, fill: '#818cf8', strokeWidth: 2, stroke: '#0f172a' }} />
+                <Line
+                  type="monotone"
+                  dataKey="bloating"
+                  name={isHr ? 'Nadutost (1-10)' : 'Bloating (1-10)'}
+                  stroke="#3b82f6"
+                  strokeWidth={3}
+                  dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#0f172a' }}
+                  activeDot={{ r: 6 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="stress"
+                  name={isHr ? 'Stres (1-10)' : 'Stress (1-10)'}
+                  stroke="#818cf8"
+                  strokeWidth={3}
+                  strokeDasharray="5 5"
+                  dot={{ r: 4, fill: '#818cf8', strokeWidth: 2, stroke: '#0f172a' }}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
           {!hasChartData && (
             <p className="mt-3 text-sm text-slate-400">
-              No symptom logs yet in this period. Add diary entries to populate the trend chart.
+              {copy.noChartData}
             </p>
           )}
         </div>
 
-        {/* Motivation Card */}
         <div className="xl:col-span-4 bg-gradient-to-br from-blue-900/20 to-slate-900/40 border border-blue-900/30 rounded-2xl p-6 backdrop-blur-sm flex flex-col h-full">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
               <Sprout className="w-4 h-4 text-blue-400" />
             </div>
-            <h2 className="text-lg font-medium">Daily SIBO Motivation</h2>
+            <h2 className="text-lg font-medium">{copy.motivationTitle}</h2>
           </div>
 
           <div className="flex-1 space-y-4">
             <p className="text-sm text-slate-300 leading-relaxed">
-              Healing the gut is a marathon, not a sprint. Small, consistent habits like spacing your meals and managing stress make a profound difference over time.
+              {copy.motivationText}
             </p>
             <div className="bg-slate-950/50 rounded-xl p-4 border border-slate-800/50">
-              <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Remember</h4>
+              <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">{copy.remember}</h4>
               <p className="text-sm text-slate-300">
-                Setbacks are normal. Focus on the progress you've made and stay consistent with your plan.
+                {copy.rememberText}
               </p>
             </div>
           </div>
@@ -325,45 +381,44 @@ export default function Dashboard() {
             onClick={() => navigate('/sibo-success')}
             className="mt-6 w-full bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
           >
-            SIBO Success
+            {copy.successCta}
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Bottom Info Row */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 pb-8">
         <section className="xl:col-span-7 bg-slate-900/40 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
-          <h3 className="text-base font-medium text-white mb-4">Common SIBO Symptom Pattern</h3>
+          <h3 className="text-base font-medium text-white mb-4">{copy.commonPattern}</h3>
           <p className="text-sm text-slate-400 leading-relaxed mb-5">
-            Symptoms often fluctuate by meal timing, food type, stress, and sleep quality. Tracking consistency over time usually gives clearer insight than looking at one isolated day.
+            {copy.commonPatternText}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
-              <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Frequent</p>
-              <p className="text-sm text-slate-200">Bloating, gas, abdominal discomfort</p>
+              <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">{copy.frequent}</p>
+              <p className="text-sm text-slate-200">{copy.frequentText}</p>
             </div>
             <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
-              <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Pattern Clues</p>
-              <p className="text-sm text-slate-200">Worse after trigger foods or shortened meal gaps</p>
+              <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">{copy.patternClues}</p>
+              <p className="text-sm text-slate-200">{copy.patternCluesText}</p>
             </div>
           </div>
         </section>
 
         <section className="xl:col-span-5 bg-slate-900/40 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
-          <h3 className="text-base font-medium text-white mb-4">Today&apos;s Focus</h3>
+          <h3 className="text-base font-medium text-white mb-4">{copy.todayFocus}</h3>
           <ul className="space-y-3 text-sm text-slate-300">
             <li className="flex items-start gap-2">
               <span className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-400 shrink-0" />
-              Keep approximately 4 hours between meals when possible.
+              {copy.focus1}
             </li>
             <li className="flex items-start gap-2">
               <span className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-400 shrink-0" />
-              Add or review your most recent breath test in the Breath Tests section.
+              {copy.focus2}
             </li>
             <li className="flex items-start gap-2">
               <span className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-400 shrink-0" />
-              Use Food Hub to check one suspected trigger ingredient today.
+              {copy.focus3}
             </li>
           </ul>
         </section>
@@ -371,5 +426,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
-

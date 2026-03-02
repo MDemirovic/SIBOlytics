@@ -1,12 +1,22 @@
 import React, { useState } from 'react';
 import { Upload, FileText, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface UploadDropzoneProps {
   onUpload: (file: File) => void;
 }
 
 export default function UploadDropzone({ onUpload }: UploadDropzoneProps) {
+  const { isHr } = useLanguage();
   const [dragActive, setDragActive] = useState(false);
+
+  const copy = {
+    title: isHr ? 'Ucitaj svoj izdisajni test' : 'Upload your Breath Test',
+    description: isHr
+      ? 'Povuci i ispusti nalaz ovdje ili klikni za odabir. Podrzani su slike, PDF i CSV.'
+      : 'Drag and drop your test report here, or click to browse. We support Images, PDFs, and CSV files.',
+    browse: isHr ? 'Odaberi datoteke' : 'Browse Files',
+  };
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -45,9 +55,9 @@ export default function UploadDropzone({ onUpload }: UploadDropzoneProps) {
       onDrop={handleDrop}
     >
       <Upload className="w-10 h-10 text-slate-500 mx-auto mb-4" />
-      <h3 className="text-lg font-medium text-white mb-2">Upload your Breath Test</h3>
+      <h3 className="text-lg font-medium text-white mb-2">{copy.title}</h3>
       <p className="text-sm text-slate-400 mb-6 max-w-sm mx-auto">
-        Drag and drop your test report here, or click to browse. We support Images, PDFs, and CSV files.
+        {copy.description}
       </p>
       
       <div className="flex justify-center gap-4 mb-6">
@@ -73,7 +83,7 @@ export default function UploadDropzone({ onUpload }: UploadDropzoneProps) {
         htmlFor="file-upload"
         className="inline-block bg-slate-800 hover:bg-slate-700 text-white px-6 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer"
       >
-        Browse Files
+        {copy.browse}
       </label>
     </div>
   );
