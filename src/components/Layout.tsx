@@ -281,7 +281,8 @@ export default function Layout() {
                 onClick={() => setIsLanguageMenuOpen((open) => !open)}
                 className="w-full flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950/70 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-slate-900 transition-colors"
                 aria-haspopup="menu"
-                aria-expanded={isLanguageMenuOpen}
+                aria-expanded={isLanguageMenuOpen ? 'true' : 'false'}
+                aria-controls="language-menu"
               >
                 <span className="flex items-center gap-2 min-w-0">
                   <span className="text-[11px] font-semibold text-blue-300">
@@ -295,7 +296,11 @@ export default function Layout() {
               </button>
 
               {isLanguageMenuOpen && (
-                <div className="absolute inset-x-0 top-full mt-1 z-20 rounded-lg border border-slate-800 bg-slate-950 p-1">
+                <div
+                  id="language-menu"
+                  role="menu"
+                  className="absolute inset-x-0 top-full mt-1 z-20 rounded-lg border border-slate-800 bg-slate-950 p-1"
+                >
                   <button
                     type="button"
                     onClick={() => {
@@ -330,7 +335,7 @@ export default function Layout() {
       </aside>
 
       <main className="flex-1 flex flex-col h-auto md:h-screen overflow-visible md:overflow-y-auto relative">
-        <header className="sticky top-0 z-30 isolate bg-slate-950/90 supports-[backdrop-filter]:bg-slate-950/70 backdrop-blur-xl border-b border-slate-800/60 px-4 md:px-8 py-4 flex items-center justify-between shadow-lg shadow-slate-950/40">
+        <header className="sticky top-0 z-30 isolate bg-slate-950/90 supports-backdrop-filter:bg-slate-950/70 backdrop-blur-xl border-b border-slate-800/60 px-4 md:px-8 py-4 flex items-center justify-between shadow-lg shadow-slate-950/40">
           <div className="flex items-start gap-3">
             <button
               onClick={() => setIsMobileSidebarOpen(true)}

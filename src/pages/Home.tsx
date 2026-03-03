@@ -26,7 +26,7 @@ export default function Home() {
           : 'Track pain, bloating, stool, stress, sleep, diarrhea, and energy to spot routines over time.',
       },
       {
-        title: isHr ? 'Prati svoje izdisajne testove' : 'Track your breath tests',
+        title: isHr ? 'Interpretacija izdisajnih testova' : 'Track your breath tests',
         desc: isHr
           ? 'Unesi rezultate ručno ili ih dodaj kao gotov test kako bi izgradio vremensku liniju.'
           : 'Upload results or add them manually to build your timeline.',
