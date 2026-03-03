@@ -11,9 +11,9 @@ export default function UploadDropzone({ onUpload }: UploadDropzoneProps) {
   const [dragActive, setDragActive] = useState(false);
 
   const copy = {
-    title: isHr ? 'Ucitaj svoj izdisajni test' : 'Upload your Breath Test',
+    title: isHr ? 'Učitaj svoj izdisajni test' : 'Upload your Breath Test',
     description: isHr
-      ? 'Povuci i ispusti nalaz ovdje ili klikni za odabir. Podrzani su slike, PDF i CSV.'
+      ? 'Povuci i ispusti nalaz ovdje ili klikni za odabir. Podržani su slike, PDF i CSV.'
       : 'Drag and drop your test report here, or click to browse. We support Images, PDFs, and CSV files.',
     browse: isHr ? 'Odaberi datoteke' : 'Browse Files',
   };

@@ -17,32 +17,32 @@ export default function BreathTests() {
 
   const copy = {
     insufficient: isHr ? 'Nedovoljno podataka' : 'Insufficient Data',
-    emptyTest: isHr ? 'Nije moguce tumacenje praznog testa.' : 'Cannot interpret empty test.',
+    emptyTest: isHr ? 'Nije moguće tumačenje praznog testa.' : 'Cannot interpret empty test.',
     normalPattern: isHr ? 'Normalan obrazac' : 'Normal Pattern',
-    normalDesc: isHr ? 'Vrijednosti su unutar tipicnih granica. Razgovaraj s lijecnikom ako simptomi traju.' : 'Values remain within typical ranges. Discuss with your doctor if symptoms persist.',
-    mixedPattern: isHr ? 'Mjesoviti obrazac (H2 i CH4)' : 'Mixed Pattern (H2 & CH4)',
+    normalDesc: isHr ? 'Vrijednosti su unutar tipičnih granica. Razgovaraj s liječnikom ako simptomi traju.' : 'Values remain within typical ranges. Discuss with your doctor if symptoms persist.',
+    mixedPattern: isHr ? 'Mješoviti obrazac (H2 i CH4)' : 'Mixed Pattern (H2 & CH4)',
     hydrogenPattern: isHr ? 'Hidrogen dominantan obrazac' : 'Hydrogen Dominant Pattern',
     methanePattern: isHr ? 'Metan dominantan obrazac (IMO)' : 'Methane Dominant Pattern (IMO)',
     yourTests: isHr ? 'Tvoji izdisajni testovi' : 'Your Breath Tests',
-    subtitle: isHr ? 'Odaberi spremljeni test pa pregledaj graf i tumacenje ispod.' : 'Choose a saved test, then review the chart and interpretation below.',
+    subtitle: isHr ? 'Odaberi spremljeni test pa pregledaj graf i tumačenje ispod.' : 'Choose a saved test, then review the chart and interpretation below.',
     addTest: isHr ? 'Dodaj test' : 'Add Test',
     chooseTest: isHr ? 'Odaberi test za prikaz' : 'Choose test to display',
     substrate: isHr ? 'Supstrat' : 'Substrate',
     savedTests: isHr ? 'Spremljeni testovi' : 'Saved Tests',
-    interpretation: isHr ? 'Tumacenje' : 'Interpretation',
+    interpretation: isHr ? 'Tumačenje testa' : 'Interpretation',
     educational: isHr ? '(Edukativno)' : '(Educational)',
     educationalHint: isHr ? 'Edukativna procjena. Nije medicinska dijagnoza.' : 'Educational heuristic. Not medical diagnosis.',
     educationalDesc: isHr
-      ? 'Tumacenje se temelji na opcenitim smjernicama (npr. North American Consensus). Rezultate uvijek potvrdi sa svojim gastroenterologom.'
+      ? 'Tumačenje se temelji na općenitim smjernicama (npr. North American Consensus). Rezultate uvijek potvrdi sa svojim gastroenterologom.'
       : 'This interpretation is based on general guidelines (e.g., North American Consensus). Always discuss your results with your gastroenterologist.',
     manageSaved: isHr ? 'Upravljanje spremljenim testovima' : 'Manage Saved Tests',
     noTestSelected: isHr ? 'Nema odabranog testa' : 'No test selected',
-    noTestText: isHr ? 'Dodaj prvi izdisajni test za prikaz grafa i edukativnog tumacenja.' : 'Add your first breath test to unlock chart view and educational interpretation.',
+    noTestText: isHr ? 'Dodaj prvi izdisajni test za prikaz grafa i edukativnog tumačenja.' : 'Add your first breath test to unlock chart view and educational interpretation.',
     deleteTitle: isHr ? 'Obrisati ovaj izdisajni test?' : 'Delete this breath test?',
-    deleteBodyA: isHr ? 'Ova radnja se ne moze ponistiti. Brises' : 'This action cannot be undone. You are deleting the',
+    deleteBodyA: isHr ? 'Ova radnja se ne može poništiti. Brišeš' : 'This action cannot be undone. You are deleting the',
     testFrom: isHr ? 'test od' : 'test from',
     cancel: isHr ? 'Odustani' : 'Cancel',
-    deleteTest: isHr ? 'Obrisi test' : 'Delete Test',
+    deleteTest: isHr ? 'Obriši test' : 'Delete Test',
   };
 
   useEffect(() => {
@@ -125,17 +125,17 @@ export default function BreathTests() {
     if (isH2Positive && isCH4Positive) {
       title = copy.mixedPattern;
       desc = isHr
-        ? `I hidrogen i metan pokazuju znacajan porast. Hidrogen je porastao za ${h2Rise} ppm, a metan je dosegao ${peakCH4} ppm. Ovakav obrazac je cesto povezan s kombiniranim simptomima.`
+        ? `I hidrogen i metan pokazuju značajan porast. Hidrogen je porastao za ${h2Rise} ppm, a metan je dosegao ${peakCH4} ppm. Ovakav obrazac je često povezan s kombiniranim simptomima.`
         : `Both Hydrogen and Methane show significant elevations. Hydrogen rose by ${h2Rise} ppm and Methane peaked at ${peakCH4} ppm. This is often associated with mixed symptoms (bloating, altered bowel habits).`;
     } else if (isH2Positive) {
       title = copy.hydrogenPattern;
       desc = isHr
-        ? `Hidrogen je porastao za ${h2Rise} ppm od pocetne vrijednosti, s vrhom u ${h2PeakTime}. minuti. ${isEarlyRise ? 'Rani porast (<=90 min) se cesto povezuje sa SIBO.' : 'Kasniji porast (>90 min) moze upucivati na fermentaciju u kolonu.'} Ovaj obrazac se cesto povezuje s proljevom.`
+        ? `Hidrogen je porastao za ${h2Rise} ppm od početne vrijednosti, s vrhom u ${h2PeakTime}. minuti. ${isEarlyRise ? 'Rani porast (<=90 min) se često povezuje sa SIBO.' : 'Kasniji porast (>90 min) može upućivati na fermentaciju u kolonu.'} Ovaj obrazac se često povezuje s proljevom.`
         : `Hydrogen rose by ${h2Rise} ppm from baseline, peaking at minute ${h2PeakTime}. ${isEarlyRise ? 'An early rise (<=90 min) is classically associated with small intestinal bacterial overgrowth.' : 'A later rise (>90 min) may reflect colonic fermentation.'} This pattern is often associated with diarrhea-predominant symptoms.`;
     } else if (isCH4Positive) {
       title = copy.methanePattern;
       desc = isHr
-        ? `Metan je dosegao ${peakCH4} ppm. Povisen metan u bilo kojoj tocki testa cesto je povezan sa zatvorom (Intestinal Methanogen Overgrowth).`
+        ? `Metan je dosegao ${peakCH4} ppm. Povišen metan u bilo kojoj točki testa često je povezan sa zatvorom (Intestinal Methanogen Overgrowth).`
         : `Methane peaked at ${peakCH4} ppm. Elevated methane at any point during the test is often associated with constipation-predominant symptoms (Intestinal Methanogen Overgrowth).`;
     }
     return { title, desc };

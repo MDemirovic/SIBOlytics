@@ -101,7 +101,7 @@ function getLatestBreathTestSummary(tests: BreathTest[], isHr: boolean): { value
 
   if (isH2Positive && isCH4Positive) {
     return {
-      value: isHr ? 'Mjesoviti obrazac' : 'Mixed Pattern',
+      value: isHr ? 'Mješoviti obrazac' : 'Mixed Pattern',
       subtitle: `${dateLabel} - H2 ${peakH2Point.h2}ppm / CH4 ${peakCH4Point.ch4}ppm`,
     };
   }
@@ -137,11 +137,11 @@ export default function Dashboard() {
   const [chartRange, setChartRange] = useState<ChartRange>(7);
 
   const copy = {
-    todaySymptomScore: isHr ? 'Danasnji rezultat simptoma' : "Today's Symptom Score",
-    logSymptoms: isHr ? 'Upisi simptome u Dnevnik simptoma' : 'Log symptoms in Symptom Diary',
+    todaySymptomScore: isHr ? 'Današnji rezultat simptoma' : "Today's Symptom Score",
+    logSymptoms: isHr ? 'Upiši simptome u Dnevnik simptoma' : 'Log symptoms in Symptom Diary',
     mmcReminder: isHr ? 'MMC podsjetnik' : 'MMC Reminder',
     mmcValue: isHr ? '4h razmak' : '4h Gap',
-    mmcSubtitle: isHr ? 'Pokusaj drzati oko 4h izmedu obroka.' : 'Try to keep around 4h between meals.',
+    mmcSubtitle: isHr ? 'Pokušaj držati oko 4h između obroka.' : 'Try to keep around 4h between meals.',
     lastBreathTest: isHr ? 'Zadnji izdisajni test' : 'Last Breath Test',
     trendsTitle: isHr ? 'Trend simptoma i stresa' : 'Symptom & Stress Trends',
     trendsSubtitle: isHr ? `Korelacija zadnjih ${chartRange} dana` : `Past ${chartRange} days correlation`,
@@ -151,30 +151,30 @@ export default function Dashboard() {
       ? 'Graf se temelji na dnevnim unosima iz Dnevnika simptoma.'
       : 'Chart is based on your Symptom Diary daily logs.',
     chartCta: isHr
-      ? 'Upisi simptome u Dnevnik simptoma kako bi ovdje vidio trendove.'
+      ? 'Upiši simptome u Dnevnik simptoma kako bi ovdje vidio trendove.'
       : 'Log symptoms in Symptom Diary to see trends here.',
     noChartData: isHr
       ? 'Nema unosa simptoma u ovom periodu. Dodaj dnevne unose za prikaz trenda.'
       : 'No symptom logs yet in this period. Add diary entries to populate the trend chart.',
     motivationTitle: isHr ? 'Dnevna SIBO motivacija' : 'Daily SIBO Motivation',
     motivationText: isHr
-      ? 'Oporavak crijeva je maraton, ne sprint. Male, dosljedne navike poput razmaka izmedu obroka i upravljanja stresom s vremenom cine veliku razliku.'
+      ? 'Oporavak crijeva je maraton, ne sprint. Male, dosljedne navike poput razmaka između obroka i upravljanja stresom s vremenom čine veliku razliku.'
       : 'Healing the gut is a marathon, not a sprint. Small, consistent habits like spacing your meals and managing stress make a profound difference over time.',
     remember: isHr ? 'Zapamti' : 'Remember',
     rememberText: isHr
       ? 'Zastoji su normalni. Fokusiraj se na napredak koji si napravio i ostani dosljedan svom planu.'
       : "Setbacks are normal. Focus on the progress you've made and stay consistent with your plan.",
     successCta: isHr ? 'SIBO uspjesi' : 'SIBO Success',
-    commonPattern: isHr ? 'Uobicajeni obrazac SIBO simptoma' : 'Common SIBO Symptom Pattern',
+    commonPattern: isHr ? 'Uobičajeni obrazac SIBO simptoma' : 'Common SIBO Symptom Pattern',
     commonPatternText: isHr
-      ? 'Simptomi cesto variraju zbog vremena obroka, vrste hrane, stresa i kvalitete sna. Pracenje kontinuiteta kroz vrijeme obicno daje jasniji uvid nego promatranje samo jednog dana.'
+      ? 'Simptomi često variraju zbog vremena obroka, vrste hrane, stresa i kvalitete sna. Praćenje kontinuiteta kroz vrijeme obično daje jasniji uvid nego promatranje samo jednog dana.'
       : 'Symptoms often fluctuate by meal timing, food type, stress, and sleep quality. Tracking consistency over time usually gives clearer insight than looking at one isolated day.',
-    frequent: isHr ? 'Cesto' : 'Frequent',
+    frequent: isHr ? 'Često' : 'Frequent',
     frequentText: isHr ? 'Nadutost, plinovi, nelagoda u trbuhu' : 'Bloating, gas, abdominal discomfort',
     patternClues: isHr ? 'Znakovi obrasca' : 'Pattern Clues',
-    patternCluesText: isHr ? 'Gore nakon trigger hrane ili kracih razmaka izmedu obroka' : 'Worse after trigger foods or shortened meal gaps',
-    todayFocus: isHr ? 'Danasnji fokus' : "Today's Focus",
-    focus1: isHr ? 'Drzi otprilike 4 sata izmedu obroka kad god je moguce.' : 'Keep approximately 4 hours between meals when possible.',
+    patternCluesText: isHr ? 'Gore nakon trigger hrane ili kraćih razmaka između obroka' : 'Worse after trigger foods or shortened meal gaps',
+    todayFocus: isHr ? 'Današnji fokus' : "Today's Focus",
+    focus1: isHr ? 'Drži otprilike 4 sata između obroka kad god je moguće.' : 'Keep approximately 4 hours between meals when possible.',
     focus2: isHr ? 'Dodaj ili pregledaj svoj zadnji izdisajni test u sekciji Izdisajni testovi.' : 'Add or review your most recent breath test in the Breath Tests section.',
     focus3: isHr ? 'U Food Hubu provjeri jedan sumnjivi sastojak danas.' : 'Use Food Hub to check one suspected trigger ingredient today.',
   };

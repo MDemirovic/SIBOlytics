@@ -32,7 +32,7 @@ export default function ManualEntryTable({ initialData, onSave, onCancel }: Manu
     glucose: isHr ? 'Glukoza' : 'Glucose',
     unknown: isHr ? 'Nepoznato' : 'Unknown',
     testDate: isHr ? 'Datum testa' : 'Test Date',
-    notesOptional: isHr ? 'Biljeske (opcionalno)' : 'Notes (Optional)',
+    notesOptional: isHr ? 'Bilješke (opcionalno)' : 'Notes (Optional)',
     notesPlaceholder: isHr ? 'npr. Post 12 sati' : 'e.g., Fasted for 12 hours',
     minute: isHr ? 'Minuta' : 'Minute',
     addRow: isHr ? 'Dodaj red' : 'Add Row',

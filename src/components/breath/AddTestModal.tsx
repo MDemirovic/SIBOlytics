@@ -21,19 +21,19 @@ export default function AddTestModal({ onClose, onSave }: AddTestModalProps) {
 
   const copy = {
     title: isHr ? 'Dodaj izdisajni test' : 'Add Breath Test',
-    uploadTab: isHr ? 'Ucitaj datoteku' : 'Upload File',
-    manualTab: isHr ? 'Rucni unos' : 'Manual Entry',
+    uploadTab: isHr ? 'Učitaj datoteku' : 'Upload File',
+    manualTab: isHr ? 'Ručni unos' : 'Manual Entry',
     extractingTitle: isHr ? 'Izdvajanje podataka...' : 'Extracting Data...',
-    extractingBody: isHr ? 'AI cita rezultate tvog testa.' : 'Using AI to read your test results.',
-    supported: isHr ? 'Podrzano: CSV (minute, h2, ch4), PNG, JPG, PDF.' : 'Supported: CSV (minute, h2, ch4), PNG, JPG, PDF.',
+    extractingBody: isHr ? 'AI čita rezultate tvog testa.' : 'Using AI to read your test results.',
+    supported: isHr ? 'Podržano: CSV (minute, h2, ch4), PNG, JPG, PDF.' : 'Supported: CSV (minute, h2, ch4), PNG, JPG, PDF.',
     reviewExtracted: isHr
-      ? 'Podaci su uspjesno izdvojeni. Molimo provjeri i ispravi eventualne greske prije spremanja.'
+      ? 'Podaci su uspješno izdvojeni. Molimo provjeri i ispravi eventualne greške prije spremanja.'
       : 'Data extracted successfully. Please review and correct any errors before saving.',
     genericManualFallback: isHr
-      ? 'Nije moguce pouzdano izdvojiti podatke. Molimo unesi rucno.'
+      ? 'Nije moguće pouzdano izdvojiti podatke. Molimo unesi ručno.'
       : 'Could not reliably extract data. Please enter manually.',
     genericProcessingError: isHr
-      ? 'Doslo je do greske tijekom obrade. Molimo koristi rucni unos.'
+      ? 'Došlo je do greške tijekom obrade. Molimo koristi ručni unos.'
       : 'An error occurred during processing. Please use Manual Entry.',
   };
 
@@ -41,13 +41,13 @@ export default function AddTestModal({ onClose, onSave }: AddTestModalProps) {
     if (!message) return copy.genericManualFallback;
     if (!isHr) return message;
     const messageMap: Record<string, string> = {
-      'Could not find minute, h2, and ch4 columns in CSV.': 'Nisu pronadeni stupci minute, h2 i ch4 u CSV datoteci.',
-      'Failed to parse CSV file.': 'Neuspjesno citanje CSV datoteke.',
-      'Could not reliably extract values from image.': 'Nije moguce pouzdano izdvojiti vrijednosti sa slike.',
+      'Could not find minute, h2, and ch4 columns in CSV.': 'Nisu pronađeni stupci minute, h2 i ch4 u CSV datoteci.',
+      'Failed to parse CSV file.': 'Neuspješno čitanje CSV datoteke.',
+      'Could not reliably extract values from image.': 'Nije moguće pouzdano izdvojiti vrijednosti sa slike.',
       'OCR processing failed.': 'OCR obrada nije uspjela.',
-      'Could not reliably extract values from PDF.': 'Nije moguce pouzdano izdvojiti vrijednosti iz PDF-a.',
+      'Could not reliably extract values from PDF.': 'Nije moguće pouzdano izdvojiti vrijednosti iz PDF-a.',
       'PDF processing failed.': 'Obrada PDF-a nije uspjela.',
-      'Unsupported file format.': 'Nepodrzan format datoteke.',
+      'Unsupported file format.': 'Nepodržan format datoteke.',
     };
     return messageMap[message] ?? copy.genericManualFallback;
   };

@@ -10,29 +10,47 @@ import {
   ReferenceLine
 } from 'recharts';
 import { BreathTest } from '../../types/breathTest';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface BreathChartProps {
   test: BreathTest;
 }
 
 export default function BreathChart({ test }: BreathChartProps) {
+  const { isHr } = useLanguage();
   const data = test.data;
+  const substrateLabel = (() => {
+    if (!isHr) return test.substrate;
+    if (test.substrate === 'lactulose') return 'laktuloza';
+    if (test.substrate === 'glucose') return 'glukoza';
+    return 'nepoznato';
+  })();
+  const copy = {
+    title: isHr ? 'Rezultati izdisajnog testa' : 'Breath Test Results',
+    substrate: isHr ? 'Supstrat' : 'Substrate',
+    hydrogen: isHr ? 'Vodik (H2)' : 'Hydrogen (H2)',
+    methane: isHr ? 'Metan (CH4)' : 'Methane (CH4)',
+    minutes: isHr ? 'Minute' : 'Minutes',
+    minutePrefix: isHr ? 'Minuta' : 'Minute',
+    hydrogenShort: isHr ? 'Vodik' : 'Hydrogen',
+    methaneShort: isHr ? 'Metan' : 'Methane',
+  };
 
   return (
     <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-medium text-white">Breath Test Results</h2>
-          <p className="text-sm text-slate-400">Substrate: <span className="capitalize">{test.substrate}</span></p>
+          <h2 className="text-lg font-medium text-white">{copy.title}</h2>
+          <p className="text-sm text-slate-400">{copy.substrate}: <span className="capitalize">{substrateLabel}</span></p>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-            <span className="text-xs font-medium text-slate-300">Hydrogen (H2)</span>
+            <span className="text-xs font-medium text-slate-300">{copy.hydrogen}</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-            <span className="text-xs font-medium text-slate-300">Methane (CH4)</span>
+            <span className="text-xs font-medium text-slate-300">{copy.methane}</span>
           </div>
         </div>
       </div>
@@ -47,7 +65,7 @@ export default function BreathChart({ test }: BreathChartProps) {
               fontSize={12} 
               tickLine={false} 
               axisLine={false} 
-              label={{ value: 'Minutes', position: 'insideBottom', offset: -10, fill: '#64748b', fontSize: 12 }}
+              label={{ value: copy.minutes, position: 'insideBottom', offset: -10, fill: '#64748b', fontSize: 12 }}
             />
             <YAxis 
               stroke="#64748b" 
@@ -60,8 +78,8 @@ export default function BreathChart({ test }: BreathChartProps) {
               contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px' }}
               itemStyle={{ color: '#f8fafc' }}
               labelStyle={{ color: '#94a3b8', marginBottom: '4px' }}
-              formatter={(value: number, name: string) => [`${value} ppm`, name === 'h2' ? 'Hydrogen' : 'Methane']}
-              labelFormatter={(label) => `Minute ${label}`}
+              formatter={(value: number, name: string) => [`${value} ppm`, name === 'h2' ? copy.hydrogenShort : copy.methaneShort]}
+              labelFormatter={(label) => `${copy.minutePrefix} ${label}`}
             />
             
             {/* Reference lines for common thresholds (educational only) */}
