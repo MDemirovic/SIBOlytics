@@ -296,14 +296,111 @@ const HR_FOOD_NAME_MAP: Record<string, string> = {
   yogurt: 'Jogurt',
 };
 
+function normalizeHrText(text: string): string {
+  const mojibakeFixed = text
+    .replaceAll('\u00C4\u2021', '\u0107')
+    .replaceAll('\u00C4\u0164', '\u010D')
+    .replaceAll('\u00C4\u2018', '\u0111')
+    .replaceAll('\u00C4\u015A', '\u010C')
+    .replaceAll('\u0139\u02DD', '\u017D')
+    .replaceAll('\u0139\u02C7', '\u0161')
+    .replaceAll('\u0139\u00BE', '\u017E')
+    .replaceAll('\u0139\u00A0', '\u0160')
+    .replaceAll('\u00E2\u20AC\u0153', '"')
+    .replaceAll('\u00E2\u20AC\u009D', '"');
+
+  const replacements: Record<string, string> = {
+    Orasasti: 'Ora\u0161asti',
+    Naranca: 'Naran\u010Da',
+    Grozdice: 'Gro\u017E\u0111ice',
+    Patlidzan: 'Patlid\u017Ean',
+    Zuta: '\u017Duta',
+    Spageti: '\u0160pageti',
+    Spinat: '\u0160pinat',
+    Rajcice: 'Raj\u010Dice',
+    Skoljkasi: '\u0160koljka\u0161i',
+    odlezani: 'odle\u017Eani',
+    svjezi: 'svje\u017Ei',
+    americki: 'ameri\u010Dki',
+    caj: '\u010Daj',
+    djumbir: '\u0111umbir',
+    Prasak: 'Pra\u0161ak',
+    Cili: '\u010Cili',
+    Mjesavina: 'Mje\u0161avina',
+    zacina: 'za\u010Dina',
+    'Muskatni orascic': 'Mu\u0161katni ora\u0161\u010Di\u0107',
+    Persin: 'Per\u0161in',
+    Ruzmarin: 'Ru\u017Emarin',
+    Safran: '\u0160afran',
+    rajcice: 'raj\u010Dice',
+    'Majcina dusica': 'Maj\u010Dina du\u0161ica',
+    zavrsavaju: 'zavr\u0161avaju',
+    Articoke: 'Arti\u010Doke',
+    Peceni: 'Pe\u010Deni',
+    Jecam: 'Je\u010Dam',
+    'Smedi secer': 'Sme\u0111i \u0161e\u0107er',
+    Cvjetaca: 'Cvjeta\u010Da',
+    Tresnje: 'Tre\u0161nje',
+    cokolada: '\u010Dokolada',
+    Cesnjak: '\u010Ce\u0161njak',
+    cesnjak: '\u010De\u0161njak',
+    Grozde: 'Gro\u017E\u0111e',
+    vecina: 've\u0107ina',
+    ovcje: 'ov\u010Dje',
+    Kruske: 'Kru\u0161ke',
+    Grasak: 'Gra\u0161ak',
+    grasak: 'gra\u0161ak',
+    Leca: 'Le\u0107a',
+    cisti: '\u010Disti',
+    Svjeze: 'Svje\u017Ee',
+    sljive: '\u0161ljive',
+    Bucine: 'Bu\u010Dine',
+    secer: '\u0161e\u0107er',
+    Secer: '\u0160e\u0107er',
+    Snjezni: 'Snje\u017Eni',
+    Susene: 'Su\u0161ene',
+    Psenica: 'P\u0161enica',
+    Zute: '\u017Dute',
+    dorucak: 'doru\u010Dak',
+    rize: 'ri\u017Ee',
+    Riza: 'Ri\u017Ea',
+    Rizini: 'Ri\u017Eini',
+    Rizino: 'Ri\u017Eino',
+    riza: 'ri\u017Ea',
+    rizini: 'ri\u017Eini',
+    rizino: 'ri\u017Eino',
+    'Kokosov secer': 'Kokosov \u0161e\u0107er',
+    brasno: 'bra\u0161no',
+    brasna: 'bra\u0161na',
+    cips: '\u010Dips',
+    Cips: '\u010Cips',
+    obicni: 'obi\u010Dni',
+    obicne: 'obi\u010Dne',
+    zitarice: '\u017Eitarice',
+  };
+
+  return Object.entries(replacements).reduce((acc, [from, to]) => acc.replaceAll(from, to), mojibakeFixed);
+}
+
+function foldSearchText(text: string): string {
+  const normalized = normalizeHrText(text).toLowerCase();
+  const withoutCombining = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return withoutCombining
+    .replaceAll('\u0111', 'd')
+    .replaceAll('\u017E', 'z')
+    .replaceAll('\u0161', 's')
+    .replaceAll('\u010D', 'c')
+    .replaceAll('\u0107', 'c');
+}
+
 function localizeFoodName(food: FoodItem, isHr: boolean): string {
   if (!isHr) return food.name;
-  return HR_FOOD_NAME_MAP[food.name] ?? food.name;
+  return normalizeHrText(HR_FOOD_NAME_MAP[food.name] ?? food.name);
 }
 
 function localizeFoodCategory(food: FoodItem, isHr: boolean): string {
   if (!isHr) return food.category;
-  return HR_FOOD_CATEGORY_MAP[food.category] ?? food.category;
+  return normalizeHrText(HR_FOOD_CATEGORY_MAP[food.category] ?? food.category);
 }
 
 export default function FoodHub() {
@@ -399,15 +496,17 @@ export default function FoodHub() {
     setDeleteCandidateId(null);
   };
 
+  const foldedQuery = foldSearchText(searchQuery);
+
   const filteredDatabase = foods.filter((food) => {
-    const query = searchQuery.toLowerCase();
     const localizedName = localizeFoodName(food, isHr);
     const localizedCategory = localizeFoodCategory(food, isHr);
-    const matchesSearch =
-      food.name.toLowerCase().includes(query) ||
-      localizedName.toLowerCase().includes(query) ||
-      food.category.toLowerCase().includes(query) ||
-      localizedCategory.toLowerCase().includes(query);
+    const matchesSearch = [
+      food.name,
+      localizedName,
+      food.category,
+      localizedCategory,
+    ].some((value) => foldSearchText(value).includes(foldedQuery));
 
     let matchesFilter = false;
     if (food.fodmapLevel === 'low' && filterLow) matchesFilter = true;
@@ -418,10 +517,11 @@ export default function FoodHub() {
     return matchesSearch && matchesFilter;
   });
 
-  const filteredLog = loggedFoods.filter((food) =>
-    food.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (food.notes && food.notes.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredLog = loggedFoods.filter((food) => {
+    const foldedName = foldSearchText(food.name);
+    const foldedNotes = foldSearchText(food.notes ?? '');
+    return foldedName.includes(foldedQuery) || foldedNotes.includes(foldedQuery);
+  });
 
   const deleteCandidate = loggedFoods.find((food) => food.id === deleteCandidateId);
 
@@ -751,3 +851,4 @@ export default function FoodHub() {
     </div>
   );
 }
+
