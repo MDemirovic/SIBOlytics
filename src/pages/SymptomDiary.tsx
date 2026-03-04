@@ -45,6 +45,14 @@ function formatDate(date: string, isHr: boolean) {
   return new Date(`${date}T00:00:00`).toLocaleDateString(isHr ? 'hr-HR' : 'en-US');
 }
 
+function getMonthStart(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function getMonthKey(date: Date): number {
+  return date.getFullYear() * 12 + date.getMonth();
+}
+
 function mapEntryToForm(entry: SymptomDiaryEntry): SymptomFormState {
   return {
     pain: entry.pain,
@@ -75,10 +83,12 @@ function SymptomSlider({
   label,
   value,
   onChange,
+  disabled,
 }: {
   label: string;
   value: number;
   onChange: (value: number) => void;
+  disabled?: boolean;
 }) {
   return (
     <label className="block space-y-2.5">
@@ -95,7 +105,8 @@ function SymptomSlider({
         step={1}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="symptom-range w-full"
+        disabled={disabled}
+        className={`symptom-range w-full ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       />
     </label>
   );
@@ -110,8 +121,7 @@ export default function SymptomDiary() {
   const [form, setForm] = useState<SymptomFormState>(EMPTY_FORM);
   const [saveFeedback, setSaveFeedback] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [historyQuery, setHistoryQuery] = useState('');
-  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => getMonthStart(new Date()));
   const previousTodayKeyRef = useRef(todayKey);
 
   const copy = {
@@ -123,11 +133,7 @@ export default function SymptomDiary() {
     today: isHr ? 'Danas' : 'Today',
     savedEntries: isHr ? 'Spremljeni dnevni unosi' : 'Saved Daily Entries',
     total: isHr ? 'ukupno' : 'total',
-    searchByDate: isHr ? 'Pretraži po datumu...' : 'Search by date...',
     noEntries: isHr ? 'Još nema unosa. Klikni "Danas" i spremi simptome.' : 'No entries yet. Click "Today" and save symptoms.',
-    noMatches: isHr ? 'Nema unosa koji odgovaraju pretraživanju.' : 'No saved entries match your search.',
-    selectedDay: isHr ? 'Odabrani dan' : 'Selected logged day',
-    clickCard: isHr ? 'Klikni karticu iznad za učitavanje u editor.' : 'Click the card above to load it into the editor.',
     pain: isHr ? 'Bol' : 'Pain',
     stress: isHr ? 'Stres' : 'Stress',
     energy: isHr ? 'Energija' : 'Energy',
@@ -163,27 +169,13 @@ export default function SymptomDiary() {
     () => entries.find((entry) => entry.date === entryDate) ?? null,
     [entries, entryDate]
   );
-  const sortedEntries = useMemo(
-    () => [...entries].sort((a, b) => b.date.localeCompare(a.date)),
-    [entries]
-  );
-  const filteredHistoryEntries = useMemo(() => {
-    const query = historyQuery.trim().toLowerCase();
-    if (!query) return sortedEntries;
-    return sortedEntries.filter((entry) => {
-      const label = formatDate(entry.date, isHr).toLowerCase();
-      return label.includes(query) || entry.date.includes(query);
-    });
-  }, [sortedEntries, historyQuery, isHr]);
-  const selectedHistoryEntry = useMemo(
-    () => entries.find((entry) => entry.id === selectedHistoryId) ?? null,
-    [entries, selectedHistoryId]
-  );
+  const entryDates = useMemo(() => new Set(entries.map((entry) => entry.date)), [entries]);
+  const isPastDate = entryDate < todayKey;
+  const isReadOnly = isPastDate;
 
   useEffect(() => {
     const loaded = loadSymptomDiary(user?.id);
     setEntries(loaded);
-    setSelectedHistoryId(loaded[0]?.id ?? null);
   }, [user]);
 
   useEffect(() => {
@@ -211,17 +203,23 @@ export default function SymptomDiary() {
   }, [entryDate, todayKey]);
 
   useEffect(() => {
+    const today = new Date(`${todayKey}T00:00:00`);
+    const currentMonthStart = getMonthStart(today);
+    setCalendarMonth((prev) => {
+      const prevKey = getMonthKey(prev);
+      const currentKey = getMonthKey(currentMonthStart);
+      if (prevKey > currentKey) return currentMonthStart;
+      return prev;
+    });
+  }, [todayKey]);
+
+  useEffect(() => {
     if (entryTarget) {
       setForm(mapEntryToForm(entryTarget));
       return;
     }
     setForm(EMPTY_FORM);
   }, [entryTarget, entryDate]);
-
-  useEffect(() => {
-    if (selectedHistoryId && entries.some((entry) => entry.id === selectedHistoryId)) return;
-    setSelectedHistoryId(sortedEntries[0]?.id ?? null);
-  }, [selectedHistoryId, entries, sortedEntries]);
 
   const persistEntries = (nextEntries: SymptomDiaryEntry[]) => {
     setEntries(nextEntries);
@@ -230,13 +228,23 @@ export default function SymptomDiary() {
 
   const handleGoToToday = () => {
     setEntryDate(todayKey);
-    const todayEntry = entries.find((entry) => entry.date === todayKey);
-    setSelectedHistoryId(todayEntry?.id ?? selectedHistoryId);
   };
 
-  const handleSelectHistoryEntry = (entry: SymptomDiaryEntry) => {
-    setEntryDate(entry.date);
-    setSelectedHistoryId(entry.id);
+  const handleSelectDate = (dateKey: string) => {
+    if (dateKey > todayKey) return;
+    setEntryDate(dateKey);
+  };
+
+  const handlePrevMonth = () => {
+    setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    const next = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1);
+    const todayMonth = getMonthStart(new Date(`${todayKey}T00:00:00`));
+    if (getMonthKey(next) <= getMonthKey(todayMonth)) {
+      setCalendarMonth(next);
+    }
   };
 
   const updateFormScore = (field: SymptomFieldKey, value: number) => {
@@ -360,51 +368,21 @@ export default function SymptomDiary() {
               <h3 className="text-sm font-medium text-slate-200">{copy.savedEntries}</h3>
               <span className="text-[11px] text-slate-500">{entries.length} {copy.total}</span>
             </div>
-            <input
-              type="text"
-              value={historyQuery}
-              onChange={(event) => setHistoryQuery(event.target.value)}
-              placeholder={copy.searchByDate}
-              className="w-full mb-3 bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
-            />
-            {entries.length === 0 ? (
+            {entries.length === 0 && (
               <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 text-sm text-slate-400">
                 {copy.noEntries}
               </div>
-            ) : (
-              <div className="space-y-3">
-                {filteredHistoryEntries.map((entry) => (
-                  <button
-                    key={entry.id}
-                    onClick={() => handleSelectHistoryEntry(entry)}
-                    className={`w-full text-left rounded-xl border p-4 transition-colors ${
-                      entryDate === entry.date
-                        ? 'border-blue-500/50 bg-blue-500/10'
-                        : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'
-                    }`}
-                  >
-                    <p className="text-sm font-medium text-white">{formatDate(entry.date, isHr)}</p>
-                    <p className="text-xs text-slate-400 mt-2">
-                      {copy.pain} {entry.pain}/10 - {copy.stress} {entry.stress}/10 - {copy.energy} {entry.energy}/10
-                    </p>
-                  </button>
-                ))}
-                {filteredHistoryEntries.length === 0 && (
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 text-sm text-slate-400">
-                    {copy.noMatches}
-                  </div>
-                )}
-                {selectedHistoryEntry && entryDate !== selectedHistoryEntry.date && (
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 mt-4">
-                    <p className="text-xs text-slate-400 mb-2">{copy.selectedDay}</p>
-                    <p className="text-sm font-medium text-white">{formatDate(selectedHistoryEntry.date, isHr)}</p>
-                    <p className="text-xs text-slate-400 mt-2">
-                      {copy.clickCard}
-                    </p>
-                  </div>
-                )}
-              </div>
             )}
+            <Calendar
+              monthStart={calendarMonth}
+              todayKey={todayKey}
+              selectedKey={entryDate}
+              entryDates={entryDates}
+              isHr={isHr}
+              onSelectDate={handleSelectDate}
+              onPrevMonth={handlePrevMonth}
+              onNextMonth={handleNextMonth}
+            />
           </div>
         </div>
 
@@ -424,6 +402,14 @@ export default function SymptomDiary() {
               {copy.scaleText}
             </p>
 
+            {isReadOnly && (
+              <div className="mb-5 rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-xs text-slate-300">
+                {entryTarget
+                  ? 'This day has already been logged. View only.'
+                  : 'This is a past day with no entry. View only.'}
+              </div>
+            )}
+
             <form onSubmit={handleSave} className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {SYMPTOM_FIELDS.map((field) => (
@@ -432,6 +418,7 @@ export default function SymptomDiary() {
                       label={fieldLabels[field]}
                       value={form[field]}
                       onChange={(value) => updateFormScore(field, value)}
+                      disabled={isReadOnly}
                     />
                   </div>
                 ))}
@@ -451,13 +438,14 @@ export default function SymptomDiary() {
                 <textarea
                   value={form.notes}
                   onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
-                  className="w-full min-h-[100px] bg-slate-950/80 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+                  disabled={isReadOnly}
+                  className={`w-full min-h-[100px] bg-slate-950/80 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 ${isReadOnly ? 'opacity-60 cursor-not-allowed' : ''}`}
                   placeholder={copy.notesPlaceholder}
                 />
               </div>
 
               <div className="flex justify-end gap-3">
-                {entryTarget && (
+                {entryTarget && !isReadOnly && (
                   <button
                     type="button"
                     onClick={handleDelete}
@@ -467,21 +455,23 @@ export default function SymptomDiary() {
                     {copy.delete}
                   </button>
                 )}
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="cursor-pointer px-5 py-2 rounded-xl text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed text-white transition-colors"
-                >
-                  {isSaving
-                    ? copy.saving
-                    : entryTarget
-                      ? entryDate === todayKey
-                        ? copy.updateToday
-                        : copy.updateDay
-                      : entryDate === todayKey
-                        ? copy.saveToday
-                        : copy.saveDay}
-                </button>
+                {!isReadOnly && (
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="cursor-pointer px-5 py-2 rounded-xl text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed text-white transition-colors"
+                  >
+                    {isSaving
+                      ? copy.saving
+                      : entryTarget
+                        ? entryDate === todayKey
+                          ? copy.updateToday
+                          : copy.updateDay
+                        : entryDate === todayKey
+                          ? copy.saveToday
+                          : copy.saveDay}
+                  </button>
+                )}
               </div>
 
               {saveFeedback && (
@@ -495,53 +485,126 @@ export default function SymptomDiary() {
               <h3 className="text-sm font-medium text-slate-200">{copy.savedEntries}</h3>
               <span className="text-[11px] text-slate-500">{entries.length} {copy.total}</span>
             </div>
-            <input
-              type="text"
-              value={historyQuery}
-              onChange={(event) => setHistoryQuery(event.target.value)}
-              placeholder={copy.searchByDate}
-              className="w-full mb-3 bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
-            />
-            {entries.length === 0 ? (
+            {entries.length === 0 && (
               <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 text-sm text-slate-400">
                 {copy.noEntries}
               </div>
-            ) : (
-              <div className="space-y-3">
-                {filteredHistoryEntries.map((entry) => (
-                  <button
-                    key={entry.id}
-                    onClick={() => handleSelectHistoryEntry(entry)}
-                    className={`w-full text-left rounded-xl border p-4 transition-colors ${
-                      entryDate === entry.date
-                        ? 'border-blue-500/50 bg-blue-500/10'
-                        : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'
-                    }`}
-                  >
-                    <p className="text-sm font-medium text-white">{formatDate(entry.date, isHr)}</p>
-                    <p className="text-xs text-slate-400 mt-2">
-                      {copy.pain} {entry.pain}/10 - {copy.stress} {entry.stress}/10 - {copy.energy} {entry.energy}/10
-                    </p>
-                  </button>
-                ))}
-                {filteredHistoryEntries.length === 0 && (
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 text-sm text-slate-400">
-                    {copy.noMatches}
-                  </div>
-                )}
-                {selectedHistoryEntry && entryDate !== selectedHistoryEntry.date && (
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 mt-4">
-                    <p className="text-xs text-slate-400 mb-2">{copy.selectedDay}</p>
-                    <p className="text-sm font-medium text-white">{formatDate(selectedHistoryEntry.date, isHr)}</p>
-                    <p className="text-xs text-slate-400 mt-2">
-                      {copy.clickCard}
-                    </p>
-                  </div>
-                )}
-              </div>
             )}
+            <Calendar
+              monthStart={calendarMonth}
+              todayKey={todayKey}
+              selectedKey={entryDate}
+              entryDates={entryDates}
+              isHr={isHr}
+              onSelectDate={handleSelectDate}
+              onPrevMonth={handlePrevMonth}
+              onNextMonth={handleNextMonth}
+            />
           </section>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function Calendar({
+  monthStart,
+  todayKey,
+  selectedKey,
+  entryDates,
+  isHr,
+  onSelectDate,
+  onPrevMonth,
+  onNextMonth,
+}: {
+  monthStart: Date;
+  todayKey: string;
+  selectedKey: string;
+  entryDates: Set<string>;
+  isHr: boolean;
+  onSelectDate: (dateKey: string) => void;
+  onPrevMonth: () => void;
+  onNextMonth: () => void;
+}) {
+  const year = monthStart.getFullYear();
+  const month = monthStart.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startIndex = (monthStart.getDay() + 6) % 7;
+  const todayMonthKey = getMonthKey(getMonthStart(new Date(`${todayKey}T00:00:00`)));
+  const currentMonthKey = getMonthKey(monthStart);
+
+  const dayLabels = isHr
+    ? ['Pon', 'Uto', 'Sri', 'Cet', 'Pet', 'Sub', 'Ned']
+    : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  const cells: Array<number | null> = [];
+  for (let i = 0; i < startIndex; i += 1) cells.push(null);
+  for (let day = 1; day <= daysInMonth; day += 1) cells.push(day);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={onPrevMonth}
+          className="px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-300 hover:bg-slate-800 transition-colors"
+        >
+          ‹
+        </button>
+        <div className="text-sm font-medium text-slate-200">
+          {monthStart.toLocaleDateString(isHr ? 'hr-HR' : 'en-US', { month: 'long', year: 'numeric' })}
+        </div>
+        <button
+          type="button"
+          onClick={onNextMonth}
+          disabled={currentMonthKey >= todayMonthKey}
+          className="px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-300 hover:bg-slate-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          ›
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-[11px] text-slate-500">
+        {dayLabels.map((label) => (
+          <div key={label} className="text-center py-1">
+            {label}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((day, index) => {
+          if (!day) {
+            return <div key={`empty-${index}`} className="h-9" />;
+          }
+          const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const isFuture = dateKey > todayKey;
+          const isSelected = dateKey === selectedKey;
+          const isToday = dateKey === todayKey;
+          const hasEntry = entryDates.has(dateKey);
+          const baseClasses = isSelected
+            ? 'border-blue-500/70 bg-blue-500/15 text-blue-200'
+            : 'border-slate-800 bg-slate-950/40 text-slate-200 hover:border-slate-700';
+          const entryClasses = hasEntry && !isSelected
+            ? 'border-emerald-400/50 bg-emerald-500/10 text-emerald-100 shadow-[0_0_0_1px_rgba(16,185,129,0.18)]'
+            : '';
+
+          return (
+            <button
+              key={dateKey}
+              type="button"
+              onClick={() => onSelectDate(dateKey)}
+              disabled={isFuture}
+              className={`h-9 rounded-lg border text-sm font-medium transition-colors relative ${baseClasses} ${entryClasses} ${isFuture ? 'opacity-40 cursor-not-allowed hover:border-slate-800' : ''}`}
+            >
+              <span className={isToday ? 'text-blue-300' : ''}>{day}</span>
+              {hasEntry && (
+                <span className={`absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full border border-slate-950/70 ${isSelected ? 'bg-blue-400' : 'bg-emerald-400'}`} />
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
