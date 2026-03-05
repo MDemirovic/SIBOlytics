@@ -40,8 +40,8 @@ export default function Home() {
       {
         title: isHr ? 'Uči iz znanstvenih izvora' : 'Learn from evidence-based research',
         desc: isHr
-          ? 'Postavljaj pitanja i pregledaj NIH izvore s citatima.'
-          : 'Ask questions and review NIH-only sources with citations.',
+          ? 'Postavljaj pitanja i pregledaj NIH izvore s citatima, uključujući novo Pimentelovo istraživanje iz 2026.'
+          : 'Ask questions and review NIH-only sources with citations, including new Pimentel research from 2026.',
       },
       {
         title: isHr ? 'Podijeli ključne zapise' : 'Share your key logs',
@@ -176,7 +176,7 @@ export default function Home() {
           </button>
 
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/summary')}
             className="text-left bg-slate-900/35 border border-slate-800 rounded-2xl p-6 h-full hover:border-slate-700 transition-colors"
           >
             <div className="flex items-center gap-3 mb-4">

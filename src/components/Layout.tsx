@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Activity,
@@ -31,6 +31,7 @@ const routePrefetchers: Record<string, () => void> = {
   '/education': () => { void import('../pages/Education'); },
   '/nih-evidence': () => { void import('../pages/NIHEvidence'); },
   '/sibo-success': () => { void import('../pages/SiboSuccess'); },
+  '/summary': () => { void import('../pages/DoctorReport'); },
   '/settings': () => { void import('../pages/Settings'); },
   '/onboarding': () => { void import('../pages/Onboarding'); },
 };
@@ -46,6 +47,7 @@ const languageCopy = {
       education: 'Education',
       nihAssistant: 'NIH AI Assistant',
       siboSuccess: 'SIBO Success',
+      doctorReport: 'Clinical Summary',
       settings: 'Settings',
     },
     header: {
@@ -64,6 +66,8 @@ const languageCopy = {
       nihSubtitle: 'Ask questions answered strictly using NIH sources.',
       successTitle: 'SIBO Success',
       successSubtitle: 'Success stories and relapse prevention strategies.',
+      doctorReportTitle: 'Summary',
+      doctorReportSubtitle: 'Personalized overview for patients and clinicians you can print or export.',
       settingsTitle: 'Settings',
       settingsSubtitle: 'Manage your profile, data, and privacy preferences.',
     },
@@ -80,34 +84,37 @@ const languageCopy = {
   },
   hr: {
     nav: {
-      home: 'Početna',
-      dashboard: 'Nadzorna ploča',
+      home: 'PoÄŤetna',
+      dashboard: 'Nadzorna ploÄŤa',
       symptomLog: 'Dnevnik simptoma',
       breathTests: 'Izdisajni testovi',
       foodHub: 'Prehrana',
       education: 'Edukacija',
       nihAssistant: 'NIH AI Asistent',
       siboSuccess: 'SIBO Uspjesi',
+      doctorReport: 'Sažetak',
       settings: 'Postavke',
     },
     header: {
-      home: 'Početna',
+      home: 'PoÄŤetna',
       dashboardTitle: (name: string) => `Dobro jutro, ${name}`,
       dashboardSubtitle: 'Ovdje je tvoj dnevni pregled probave.',
       symptomDiaryTitle: 'Dnevnik simptoma',
-      symptomDiarySubtitle: 'Bilježi dnevne simptome kako bi pratio trendove kroz vrijeme.',
+      symptomDiarySubtitle: 'BiljeĹľi dnevne simptome kako bi pratio trendove kroz vrijeme.',
       breathTestsTitle: 'Izdisajni testovi',
       breathTestsSubtitle: 'Prati i analiziraj svoje rezultate izdisajnih testova kroz vrijeme.',
       foodHubTitle: 'Prehrana',
-      foodHubSubtitle: 'Bilježi obroke, skeniraj sastojke i otkrij osobne triggere.',
-      educationTitle: 'Edukacija i istraživanja',
-      educationSubtitle: 'Istraži informacije o SIBO i IBS temeljene na dokazima.',
+      foodHubSubtitle: 'BiljeĹľi obroke, skeniraj sastojke i otkrij osobne triggere.',
+      educationTitle: 'Edukacija i istraĹľivanja',
+      educationSubtitle: 'IstraĹľi informacije o SIBO i IBS temeljene na dokazima.',
       nihTitle: 'NIH AI Asistent',
-      nihSubtitle: 'Postavi pitanje i dobij odgovor koristeći samo NIH izvore.',
+      nihSubtitle: 'Postavi pitanje i dobij odgovor koristeÄ‡i samo NIH izvore.',
       successTitle: 'SIBO Uspjesi',
-      successSubtitle: 'Priče o uspjehu i strategije prevencije relapsa.',
+      successSubtitle: 'PriÄŤe o uspjehu i strategije prevencije relapsa.',
+      doctorReportTitle: 'Sažetak',
+      doctorReportSubtitle: 'Personalizirani pregled za pacijenta i kliničara koji možeš ispisati ili izvesti.',
       settingsTitle: 'Postavke',
-      settingsSubtitle: 'Upravljaj profilom, podacima i privatnošću.',
+      settingsSubtitle: 'Upravljaj profilom, podacima i privatnoĹˇÄ‡u.',
     },
     misc: {
       guest: 'Gost',
@@ -208,6 +215,9 @@ export default function Layout() {
         return { title: copy.header.nihTitle, subtitle: copy.header.nihSubtitle };
       case '/sibo-success':
         return { title: copy.header.successTitle, subtitle: copy.header.successSubtitle };
+      case '/summary':
+      case '/doctor-report':
+        return { title: copy.header.doctorReportTitle, subtitle: copy.header.doctorReportSubtitle };
       case '/settings':
         return { title: copy.header.settingsTitle, subtitle: copy.header.settingsSubtitle };
       default:
@@ -257,6 +267,7 @@ export default function Layout() {
           <NavItem icon={<BookOpen />} label={copy.nav.education} to="/education" onPrefetch={routePrefetchers['/education']} />
           <NavItem icon={<Bot />} label={copy.nav.nihAssistant} to="/nih-evidence" onPrefetch={routePrefetchers['/nih-evidence']} />
           <NavItem icon={<Heart />} label={copy.nav.siboSuccess} to="/sibo-success" onPrefetch={routePrefetchers['/sibo-success']} />
+          <NavItem icon={<FileText />} label={copy.nav.doctorReport} to="/summary" onPrefetch={routePrefetchers['/summary']} />
         </nav>
 
         <div className="p-4 mt-auto space-y-4">

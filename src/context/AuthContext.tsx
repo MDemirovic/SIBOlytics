@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, {createContext, useContext, useEffect, useState} from 'react';
 
 export interface User {
   id: string;
@@ -30,135 +30,182 @@ interface AuthContextType {
   resetPassword: (token: string, password: string) => Promise<AuthResult>;
 }
 
+type AuthApiResponse = {
+  success: boolean;
+  user?: User;
+  error?: string;
+  code?: string;
+  message?: string;
+  requiresEmailVerification?: boolean;
+};
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const AUTH_USER_KEY = 'sibolytics_auth_user';
-const AUTH_USERS_KEY = 'sibolytics_auth_users';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim().replace(/\/$/, '') || '';
 
-function loadUsers(): User[] {
-  const stored = localStorage.getItem(AUTH_USERS_KEY);
-  if (!stored) return [];
-  try {
-    return JSON.parse(stored) as User[];
-  } catch {
-    return [];
-  }
+function apiUrl(path: string) {
+  if (!API_BASE) return path;
+  return `${API_BASE}${path}`;
 }
 
-function saveUsers(users: User[]) {
-  localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users));
-}
-
-function deriveNameFromEmail(email: string): string {
-  const prefix = email.split('@')[0] || 'User';
-  const cleaned = prefix.replace(/[._-]+/g, ' ').trim();
-  if (!cleaned) return 'User';
-  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-}
-
-function createUser(email: string, name?: string): User {
-  const trimmedEmail = email.trim();
-  const displayName = name?.trim() || deriveNameFromEmail(trimmedEmail);
-  return {
-    id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    email: trimmedEmail,
-    name: displayName,
-    hasCompletedOnboarding: false,
-    emailVerified: true,
+async function apiRequest(path: string, init: RequestInit = {}): Promise<AuthApiResponse> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
   };
+
+  const response = await fetch(apiUrl(path), {
+    ...init,
+    headers: {
+      ...headers,
+      ...(init.headers ?? {}),
+    },
+    credentials: 'include',
+  });
+
+  const text = await response.text();
+  let data: AuthApiResponse = {success: response.ok};
+
+  if (text) {
+    try {
+      data = JSON.parse(text) as AuthApiResponse;
+    } catch {
+      data = {success: response.ok};
+    }
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      error: data.error || 'Request failed.',
+      code: data.code,
+      message: data.message,
+      requiresEmailVerification: data.requiresEmailVerification,
+    };
+  }
+
+  return data;
 }
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({children}: {children: React.ReactNode}) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem(AUTH_USER_KEY);
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored) as User);
-      } catch {
+    const loadCurrentUser = async () => {
+      const result = await apiRequest('/api/auth/me', {method: 'GET'});
+      if (result.success && result.user) {
+        setUser(result.user);
+      } else {
         setUser(null);
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+
+    loadCurrentUser().catch(() => {
+      setUser(null);
+      setLoading(false);
+    });
   }, []);
 
   const login = async (email: string, password: string): Promise<AuthResult> => {
-    const normalizedEmail = email.trim().toLowerCase();
-    const users = loadUsers();
-    let existing = users.find((entry) => entry.email.toLowerCase() === normalizedEmail);
+    try {
+      const result = await apiRequest('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({email, password}),
+      });
 
-    if (!existing) {
-      existing = createUser(email);
-      users.unshift(existing);
-      saveUsers(users);
+      if (!result.success || !result.user) {
+        return {success: false, error: result.error || 'Sign in failed.', code: result.code};
+      }
+
+      setUser(result.user);
+      return {success: true};
+    } catch {
+      return {success: false, error: 'Server is unavailable. Please try again.'};
     }
-
-    setUser(existing);
-    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(existing));
-    return { success: true };
   };
 
   const signup = async (email: string, name: string, password: string): Promise<AuthResult> => {
-    const normalizedEmail = email.trim().toLowerCase();
-    const users = loadUsers();
-    const existingIndex = users.findIndex((entry) => entry.email.toLowerCase() === normalizedEmail);
+    try {
+      const result = await apiRequest('/api/auth/signup', {
+        method: 'POST',
+        body: JSON.stringify({email, name, password}),
+      });
 
-    if (existingIndex >= 0) {
-      const updated = { ...users[existingIndex], name: name.trim() || users[existingIndex].name };
-      users[existingIndex] = updated;
-      saveUsers(users);
-      return { success: true, requiresEmailVerification: false };
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || 'Could not create account.',
+          code: result.code,
+          message: result.message,
+        };
+      }
+
+      return {
+        success: true,
+        requiresEmailVerification: Boolean(result.requiresEmailVerification),
+      };
+    } catch {
+      return {success: false, error: 'Server is unavailable. Please try again.'};
     }
-
-    const newUser = createUser(email, name);
-    saveUsers([newUser, ...users]);
-    return { success: true, requiresEmailVerification: false };
   };
 
   const logout = async () => {
-    setUser(null);
-    localStorage.removeItem(AUTH_USER_KEY);
+    try {
+      await apiRequest('/api/auth/logout', {method: 'POST'});
+    } finally {
+      setUser(null);
+    }
   };
 
   const completeOnboarding = async (data: any): Promise<AuthResult> => {
-    if (!user) {
-      return { success: false, error: 'User not logged in.' };
-    }
+    try {
+      const result = await apiRequest('/api/auth/complete-onboarding', {
+        method: 'POST',
+        body: JSON.stringify(data ?? {}),
+      });
 
-    const users = loadUsers();
-    const updatedUser = { ...user, hasCompletedOnboarding: true };
-    const nextUsers = users.map((entry) => (entry.id === user.id ? updatedUser : entry));
-    saveUsers(nextUsers);
-    setUser(updatedUser);
-    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(updatedUser));
-    localStorage.setItem(`sibolytics_onboarding_${user.id}`, JSON.stringify(data));
-    return { success: true };
+      if (!result.success) {
+        return {success: false, error: result.error || 'Could not complete onboarding.'};
+      }
+
+      if (result.user) {
+        setUser(result.user);
+      }
+
+      return {success: true};
+    } catch {
+      return {success: false, error: 'Server is unavailable. Please try again.'};
+    }
   };
 
   const deleteAccount = async (): Promise<AuthResult> => {
-    if (!user) return { success: true };
-    const users = loadUsers().filter((entry) => entry.id !== user.id);
-    saveUsers(users);
-    setUser(null);
-    localStorage.removeItem(AUTH_USER_KEY);
-    return { success: true };
+    try {
+      const result = await apiRequest('/api/auth/account', {method: 'DELETE'});
+      if (!result.success) {
+        return {success: false, error: result.error || 'Could not delete account.'};
+      }
+
+      setUser(null);
+      return {success: true};
+    } catch {
+      return {success: false, error: 'Server is unavailable. Please try again.'};
+    }
   };
 
-  const resendVerification = async (email: string): Promise<AuthResult> => {
-    return { success: true, message: 'Verification email sent.' };
+  const resendVerification = async (_email: string): Promise<AuthResult> => {
+    return {success: true, message: 'Verification email is not enabled yet.'};
   };
 
-  const requestPasswordReset = async (email: string): Promise<AuthResult> => {
-    return { success: true, message: 'Reset email sent.' };
+  const requestPasswordReset = async (_email: string): Promise<AuthResult> => {
+    return {success: true, message: 'Password reset is not enabled yet.'};
   };
 
-  const verifyEmailToken = async (token: string): Promise<AuthResult> => {
-    return { success: true, message: 'Email verified.' };
+  const verifyEmailToken = async (_token: string): Promise<AuthResult> => {
+    return {success: true, message: 'Email verification is not enabled yet.'};
   };
 
-  const resetPassword = async (token: string, password: string): Promise<AuthResult> => {
-    return { success: true, message: 'Password reset successful.' };
+  const resetPassword = async (_token: string, _password: string): Promise<AuthResult> => {
+    return {success: true, message: 'Password reset is not enabled yet.'};
   };
 
   return (

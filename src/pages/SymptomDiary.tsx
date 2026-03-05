@@ -279,7 +279,6 @@ export default function SymptomDiary() {
     const updated = [nextEntry, ...entries.filter((entry) => entry.date !== entryDate)]
       .sort((a, b) => b.date.localeCompare(a.date));
     persistEntries(updated);
-    setSelectedHistoryId(nextEntry.id);
     setSaveFeedback(
       `${copy.savedFor} ${formatDate(nextEntry.date, isHr)} ${copy.at} ${new Date().toLocaleTimeString([], {
         hour: '2-digit',
@@ -294,7 +293,6 @@ export default function SymptomDiary() {
     const deletedDate = entryTarget.date;
     const updated = entries.filter((entry) => entry.date !== entryDate);
     persistEntries(updated);
-    setSelectedHistoryId(updated[0]?.id ?? null);
     setSaveFeedback(`${copy.deletedFor} ${formatDate(deletedDate, isHr)}.`);
   };
 
