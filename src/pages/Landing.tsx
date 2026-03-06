@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Wind, Activity, Clock, FileText, ChevronRight } from 'lucide-react';
+import { Wind, ChevronRight } from 'lucide-react';
 
 export default function Landing() {
   return (
@@ -68,3 +68,4 @@ export default function Landing() {
     </div>
   );
 }
+

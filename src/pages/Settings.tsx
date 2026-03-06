@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { User, Download, Trash2, LogOut, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
+import { getBreathTests, getFoodLogs, getOnboardingData, getSymptomEntries } from '../services/healthApi';
 
 export default function Settings() {
   const { user, logout, deleteAccount } = useAuth();
@@ -10,42 +11,61 @@ export default function Settings() {
   const navigate = useNavigate();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [error, setError] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
   const copy = {
     settings: isHr ? 'Postavke' : 'Settings',
-    subtitle: isHr ? 'Upravljaj profilom, podacima i privatnošću.' : 'Manage your profile, data, and privacy preferences.',
-    deleteError: isHr ? 'Brisanje računa nije uspjelo.' : 'Could not delete account.',
+    subtitle: isHr ? 'Upravljaj profilom, podacima i privatnoĹˇÄ‡u.' : 'Manage your profile, data, and privacy preferences.',
+    deleteError: isHr ? 'Brisanje raÄŤuna nije uspjelo.' : 'Could not delete account.',
     profile: isHr ? 'Profil' : 'Profile',
     dataPrivacy: isHr ? 'Podaci i privatnost' : 'Data & Privacy',
     exportData: isHr ? 'Izvezi moje podatke' : 'Export My Data',
     exportDesc: isHr ? 'Preuzmi JSON datoteku sa svim spremljenim testovima i postavkama.' : 'Download a JSON file containing all your saved tests and settings.',
     exportBtn: isHr ? 'Izvezi' : 'Export',
-    clearData: isHr ? 'Obriši moje podatke' : 'Clear My Data',
-    clearDesc: isHr ? 'Trajno obriši sve svoje podatke s ovog uređaja.' : 'Permanently delete all your data from this device.',
-    clearBtn: isHr ? 'Obriši podatke' : 'Clear Data',
+    clearData: isHr ? 'ObriĹˇi moje podatke' : 'Clear My Data',
+    clearDesc: isHr ? 'Trajno obriĹˇi sve svoje podatke s ovog ureÄ‘aja.' : 'Permanently delete all your data from this device.',
+    clearBtn: isHr ? 'ObriĹˇi podatke' : 'Clear Data',
     cancel: isHr ? 'Odustani' : 'Cancel',
     confirmDelete: isHr ? 'Potvrdi brisanje' : 'Confirm Delete',
     logout: isHr ? 'Odjavi se' : 'Log out',
+    exportError: isHr ? 'Izvoz podataka nije uspio.' : 'Could not export data.',
+    exporting: isHr ? 'Izvoz...' : 'Exporting...',
   };
 
-  const handleExportData = () => {
+  const handleExportData = async () => {
     if (!user) return;
-    
-    // Gather all user data from localStorage
-    const data: Record<string, any> = {
-      profile: user,
-      onboarding: JSON.parse(localStorage.getItem(`sibolytics_onboarding_${user.id}`) || 'null'),
-      breathTests: JSON.parse(localStorage.getItem(`sibolytics_breathtests_${user.id}`) || '[]'),
-    };
 
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `sibolytics_data_${user.email}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    setError('');
+    setIsExporting(true);
+    try {
+      const [onboarding, symptoms, foodLogs, breathTests] = await Promise.all([
+        getOnboardingData(),
+        getSymptomEntries(),
+        getFoodLogs(),
+        getBreathTests(),
+      ]);
+
+      const data: Record<string, any> = {
+        profile: user,
+        onboarding,
+        symptoms,
+        foodLogs,
+        breathTests,
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sibolytics_data_${user.email}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      setError(copy.exportError);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleClearData = () => {
@@ -59,10 +79,8 @@ export default function Settings() {
         return;
       }
 
-      localStorage.removeItem(`sibolytics_onboarding_${user.id}`);
-      localStorage.removeItem(`sibolytics_breathtests_${user.id}`);
-      localStorage.removeItem(`sibolytics_foodlog_${user.id}`);
       navigate('/');
+
     };
 
     run();
@@ -122,9 +140,10 @@ export default function Settings() {
               </div>
             <button 
               onClick={handleExportData}
-              className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              disabled={isExporting}
+              className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             >
-              <Download className="w-4 h-4" /> {copy.exportBtn}
+              <Download className="w-4 h-4" /> {isExporting ? copy.exporting : copy.exportBtn}
             </button>
           </div>
 
@@ -173,3 +192,4 @@ export default function Settings() {
     </div>
   );
 }
+

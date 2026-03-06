@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, Trash2, Activity } from 'lucide-react';
+import { Trash2, Activity } from 'lucide-react';
 import { BreathTest } from '../../types/breathTest';
 
 interface TestHistoryProps {
@@ -96,3 +96,4 @@ export default function TestHistory({ tests, selectedTestId, onSelect, onDelete 
     </div>
   );
 }
+

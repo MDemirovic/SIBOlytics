@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   Clock,
@@ -19,8 +19,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { BreathTest } from '../types/breathTest';
+import { getBreathTests, getSymptomEntries } from '../services/healthApi';
 import { SymptomDiaryEntry } from '../types/symptomDiary';
-import { getLocalDateKey, getSymptomDiaryStorageKey, loadSymptomDiary } from '../utils/symptomDiaryStorage';
+import { getLocalDateKey } from '../utils/symptomDiaryStorage';
 
 type ChartRange = 7 | 30;
 
@@ -185,29 +186,16 @@ export default function Dashboard() {
       return;
     }
 
-    const storageKey = `sibolytics_breathtests_${user.id}`;
-    const loadTests = () => {
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) {
-        setTests([]);
-        return;
-      }
+    const loadTests = async () => {
       try {
-        const parsed = JSON.parse(raw);
-        setTests(Array.isArray(parsed) ? parsed : []);
+        const loaded = await getBreathTests();
+        setTests(loaded);
       } catch {
         setTests([]);
       }
     };
 
-    loadTests();
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === storageKey) {
-        loadTests();
-      }
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    void loadTests();
   }, [user]);
 
   const latestBreathTest = useMemo(() => getLatestBreathTestSummary(tests, isHr), [tests, isHr]);
@@ -219,17 +207,16 @@ export default function Dashboard() {
       return;
     }
 
-    const storageKey = getSymptomDiaryStorageKey(user.id);
-    const syncDiary = () => setDiaryEntries(loadSymptomDiary(user.id));
-
-    syncDiary();
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === storageKey) {
-        syncDiary();
+    const loadDiary = async () => {
+      try {
+        const loaded = await getSymptomEntries();
+        setDiaryEntries(loaded);
+      } catch {
+        setDiaryEntries([]);
       }
     };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+
+    void loadDiary();
   }, [user]);
 
   const todayEntry = useMemo(
@@ -426,3 +413,6 @@ export default function Dashboard() {
     </div>
   );
 }
+
+
+

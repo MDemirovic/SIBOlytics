@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Wind, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { createFoodLog, getFoodLogs } from '../services/healthApi';
 
 export default function Onboarding() {
   const { user, completeOnboarding } = useAuth();
@@ -9,15 +10,15 @@ export default function Onboarding() {
   const [step, setStep] = useState(1);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     primarySymptom: '',
     severity: 5,
     stoolPattern: '',
-    suspectedTriggers: ''
+    suspectedTriggers: '',
   });
 
-  const addTriggersToFoodLog = (userId: string, triggersText: string) => {
+  const addTriggersToFoodLog = async (triggersText: string) => {
     const rawTriggers = triggersText
       .split(/[,;\n]/)
       .map((value) => value.trim())
@@ -25,57 +26,56 @@ export default function Onboarding() {
 
     if (rawTriggers.length === 0) return;
 
-    type LoggedFood = {
-      id: string;
-      name: string;
-      amount: string;
-      status: 'safe' | 'caution' | 'trigger';
-      notes?: string;
-      createdAt: string;
-    };
-
-    const storageKey = `sibolytics_foodlog_${userId}`;
-    const stored = localStorage.getItem(storageKey);
-    const existing: LoggedFood[] = stored ? JSON.parse(stored) : [];
+    const existing = await getFoodLogs();
     const existingNames = new Set(
       existing.map((food) => food.name.trim().toLowerCase())
     );
 
-    const newItems: LoggedFood[] = [];
-    for (const trigger of rawTriggers) {
+    const newTriggers = rawTriggers.filter((trigger) => {
       const normalized = trigger.toLowerCase();
-      if (existingNames.has(normalized)) continue;
+      if (existingNames.has(normalized)) return false;
       existingNames.add(normalized);
-      newItems.push({
-        id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        name: trigger,
-        amount: 'suspected',
-        status: 'trigger',
-        createdAt: new Date().toISOString()
-      });
-    }
+      return true;
+    });
 
-    if (newItems.length === 0) return;
-    localStorage.setItem(storageKey, JSON.stringify([...newItems, ...existing]));
+    await Promise.all(
+      newTriggers.map((name) =>
+        createFoodLog({
+          name,
+          amount: 'suspected',
+          status: 'trigger',
+          notes: '',
+        })
+      )
+    );
   };
 
   const handleNext = async () => {
     if (step < 2) {
       setStep(step + 1);
-    } else {
-      setError('');
-      setIsSubmitting(true);
-      const result = await completeOnboarding(formData);
-      setIsSubmitting(false);
-      if (!result.success) {
-        setError(result.error || 'Could not complete onboarding.');
-        return;
-      }
-      if (user?.id) {
-        addTriggersToFoodLog(user.id, formData.suspectedTriggers);
-      }
-      navigate('/home');
+      return;
     }
+
+    setError('');
+    setIsSubmitting(true);
+
+    const result = await completeOnboarding(formData);
+    if (!result.success) {
+      setIsSubmitting(false);
+      setError(result.error || 'Could not complete onboarding.');
+      return;
+    }
+
+    try {
+      if (user?.id) {
+        await addTriggersToFoodLog(formData.suspectedTriggers);
+      }
+    } catch {
+      // Keep onboarding successful even if trigger seeding fails.
+    }
+
+    setIsSubmitting(false);
+    navigate('/home');
   };
 
   return (
@@ -94,8 +94,8 @@ export default function Onboarding() {
             <span>{step === 1 ? 'Symptoms' : 'Triggers'}</span>
           </div>
           <div className="w-full bg-slate-800 rounded-full h-1.5">
-            <div 
-              className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" 
+            <div
+              className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
               style={{ width: `${(step / 2) * 100}%` }}
             ></div>
           </div>
@@ -109,13 +109,13 @@ export default function Onboarding() {
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-3">What is your primary symptom?</label>
               <div className="grid grid-cols-2 gap-3">
-                {['Bloating', 'Abdominal Pain', 'Gas', 'Brain Fog'].map(sym => (
+                {['Bloating', 'Abdominal Pain', 'Gas', 'Brain Fog'].map((sym) => (
                   <button
                     key={sym}
-                    onClick={() => setFormData({...formData, primarySymptom: sym})}
+                    onClick={() => setFormData({ ...formData, primarySymptom: sym })}
                     className={`p-3 rounded-xl border text-sm font-medium transition-all cursor-pointer ${
-                      formData.primarySymptom === sym 
-                        ? 'bg-blue-600/20 border-blue-500 text-blue-400' 
+                      formData.primarySymptom === sym
+                        ? 'bg-blue-600/20 border-blue-500 text-blue-400'
                         : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
                     }`}
                   >
@@ -129,11 +129,12 @@ export default function Onboarding() {
               <label className="block text-sm font-medium text-slate-300 mb-3">
                 Overall severity (1-10): <span className="text-white">{formData.severity}</span>
               </label>
-              <input 
-                type="range" 
-                min="1" max="10" 
+              <input
+                type="range"
+                min="1"
+                max="10"
                 value={formData.severity}
-                onChange={(e) => setFormData({...formData, severity: parseInt(e.target.value)})}
+                onChange={(e) => setFormData({ ...formData, severity: parseInt(e.target.value, 10) })}
                 className="w-full accent-blue-500 cursor-pointer"
               />
             </div>
@@ -141,13 +142,13 @@ export default function Onboarding() {
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-3">Typical stool pattern</label>
               <div className="grid grid-cols-3 gap-3">
-                {['Constipation', 'Diarrhea', 'Mixed/Normal'].map(pat => (
+                {['Constipation', 'Diarrhea', 'Mixed/Normal'].map((pat) => (
                   <button
                     key={pat}
-                    onClick={() => setFormData({...formData, stoolPattern: pat})}
+                    onClick={() => setFormData({ ...formData, stoolPattern: pat })}
                     className={`cursor-pointer p-3 rounded-xl border text-sm font-medium transition-all cursor-pointer ${
-                      formData.stoolPattern === pat 
-                        ? 'bg-blue-600/20 border-blue-500 text-blue-400' 
+                      formData.stoolPattern === pat
+                        ? 'bg-blue-600/20 border-blue-500 text-blue-400'
                         : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
                     }`}
                   >
@@ -166,15 +167,15 @@ export default function Onboarding() {
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1.5">List suspected triggers (optional)</label>
-              <textarea 
+              <textarea
                 rows={4}
                 value={formData.suspectedTriggers}
-                onChange={(e) => setFormData({...formData, suspectedTriggers: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, suspectedTriggers: e.target.value })}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all resize-none"
                 placeholder="e.g., Garlic, onion, lactose, apples..."
               />
             </div>
-            
+
             <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
               <p className="text-xs text-blue-300 leading-relaxed">
                 <strong>Note:</strong> We will use this to highlight potential risks in food hub.
@@ -190,7 +191,7 @@ export default function Onboarding() {
         )}
 
         <div className="mt-8 flex justify-end">
-          <button 
+          <button
             onClick={handleNext}
             disabled={isSubmitting || (step === 1 && (!formData.primarySymptom || !formData.stoolPattern))}
             className="cursor-pointer bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-xl font-medium transition-colors flex items-center gap-2"

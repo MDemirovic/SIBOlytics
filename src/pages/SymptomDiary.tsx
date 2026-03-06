@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { SymptomDiaryEntry } from '../types/symptomDiary';
-import { getLocalDateKey, loadSymptomDiary, saveSymptomDiary } from '../utils/symptomDiaryStorage';
+import { deleteSymptomEntry, getSymptomEntries, upsertSymptomEntry } from '../services/healthApi';
+import { getLocalDateKey } from '../utils/symptomDiaryStorage';
 
 type SymptomFieldKey =
   | 'pain'
@@ -125,29 +126,29 @@ export default function SymptomDiary() {
   const previousTodayKeyRef = useRef(todayKey);
 
   const copy = {
-    loginPrompt: isHr ? 'Prijavi se za korištenje Dnevnika simptoma.' : 'Sign in to use Symptom Diary.',
+    loginPrompt: isHr ? 'Prijavi se za koriĹˇtenje Dnevnika simptoma.' : 'Sign in to use Symptom Diary.',
     todayIs: isHr ? 'Danas je' : 'Today is',
-    editingToday: isHr ? 'Trenutno uređuješ danas. Moguć je samo jedan unos dnevno.' : 'You are currently editing today. One entry per day is enforced.',
-    viewingDay: isHr ? 'Pregledavaš' : 'You are viewing',
+    editingToday: isHr ? 'Trenutno ureÄ‘ujeĹˇ danas. MoguÄ‡ je samo jedan unos dnevno.' : 'You are currently editing today. One entry per day is enforced.',
+    viewingDay: isHr ? 'PregledavaĹˇ' : 'You are viewing',
     returnToday: isHr ? 'Klikni "Danas" za povratak.' : 'Click "Today" to return.',
     today: isHr ? 'Danas' : 'Today',
     savedEntries: isHr ? 'Spremljeni dnevni unosi' : 'Saved Daily Entries',
     total: isHr ? 'ukupno' : 'total',
-    noEntries: isHr ? 'Još nema unosa. Klikni "Danas" i spremi simptome.' : 'No entries yet. Click "Today" and save symptoms.',
+    noEntries: isHr ? 'JoĹˇ nema unosa. Klikni "Danas" i spremi simptome.' : 'No entries yet. Click "Today" and save symptoms.',
     pain: isHr ? 'Bol' : 'Pain',
     stress: isHr ? 'Stres' : 'Stress',
     energy: isHr ? 'Energija' : 'Energy',
-    titleToday: isHr ? 'Današnji simptomi' : "Today's Symptoms",
+    titleToday: isHr ? 'DanaĹˇnji simptomi' : "Today's Symptoms",
     titleDaily: isHr ? 'Dnevni simptomi' : 'Daily Symptoms',
     titleAdd: isHr ? 'Dodaj simptome' : 'Add symptoms',
-    scaleText: isHr ? '1 je najgore (crveno), 10 je najbolje (zeleno). Spremi za novi unos ili ažuriranje dana.' : '1 is worst (red), 10 is best (green). Save to create or update this day.',
-    overall: isHr ? 'Izračunati ukupni dan' : 'Calculated overall day',
-    notes: isHr ? 'Bilješke' : 'Notes',
-    notesPlaceholder: isHr ? 'Opcionalne bilješke...' : 'Optional notes...',
-    delete: isHr ? 'Obriši' : 'Delete',
+    scaleText: isHr ? '1 je najgore (crveno), 10 je najbolje (zeleno). Spremi za novi unos ili aĹľuriranje dana.' : '1 is worst (red), 10 is best (green). Save to create or update this day.',
+    overall: isHr ? 'IzraÄŤunati ukupni dan' : 'Calculated overall day',
+    notes: isHr ? 'BiljeĹˇke' : 'Notes',
+    notesPlaceholder: isHr ? 'Opcionalne biljeĹˇke...' : 'Optional notes...',
+    delete: isHr ? 'ObriĹˇi' : 'Delete',
     saving: isHr ? 'Spremanje...' : 'Saving...',
-    updateToday: isHr ? 'Ažuriraj danas' : 'Update Today',
-    updateDay: isHr ? 'Ažuriraj odabrani dan' : 'Update Selected Day',
+    updateToday: isHr ? 'AĹľuriraj danas' : 'Update Today',
+    updateDay: isHr ? 'AĹľuriraj odabrani dan' : 'Update Selected Day',
     saveToday: isHr ? 'Spremi danas' : 'Save Today',
     saveDay: isHr ? 'Spremi odabrani dan' : 'Save Selected Day',
     savedFor: isHr ? 'Spremljeno za' : 'Saved for',
@@ -173,10 +174,23 @@ export default function SymptomDiary() {
   const isPastDate = entryDate < todayKey;
   const isReadOnly = isPastDate;
 
-  useEffect(() => {
-    const loaded = loadSymptomDiary(user?.id);
-    setEntries(loaded);
-  }, [user]);
+    useEffect(() => {
+    if (!user) {
+      setEntries([]);
+      return;
+    }
+
+    const loadEntries = async () => {
+      try {
+        const loaded = await getSymptomEntries();
+        setEntries(loaded);
+      } catch {
+        setSaveFeedback(isHr ? 'Ucavanje dnevnika nije uspjelo.' : 'Could not load symptom diary.');
+      }
+    };
+
+    void loadEntries();
+  }, [user, isHr]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -221,11 +235,6 @@ export default function SymptomDiary() {
     setForm(EMPTY_FORM);
   }, [entryTarget, entryDate]);
 
-  const persistEntries = (nextEntries: SymptomDiaryEntry[]) => {
-    setEntries(nextEntries);
-    saveSymptomDiary(nextEntries, user?.id);
-  };
-
   const handleGoToToday = () => {
     setEntryDate(todayKey);
   };
@@ -254,46 +263,50 @@ export default function SymptomDiary() {
     });
   };
 
-  const handleSave = (event: React.FormEvent) => {
+    const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsSaving(true);
 
-    const now = new Date().toISOString();
-    const calculatedOverall = calculateOverall(form);
-    const nextEntry: SymptomDiaryEntry = {
-      id: entryTarget?.id ?? `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      date: entryDate,
-      pain: form.pain,
-      stress: form.stress,
-      sleep: form.sleep,
-      stool: form.stool,
-      bloating: form.bloating,
-      diarrhea: form.diarrhea,
-      energy: form.energy,
-      overallGut: calculatedOverall,
-      notes: form.notes.trim(),
-      createdAt: entryTarget?.createdAt ?? now,
-      updatedAt: now,
-    };
+    try {
+      const saved = await upsertSymptomEntry(entryDate, {
+        pain: form.pain,
+        stress: form.stress,
+        sleep: form.sleep,
+        stool: form.stool,
+        bloating: form.bloating,
+        diarrhea: form.diarrhea,
+        energy: form.energy,
+        notes: form.notes.trim(),
+      });
 
-    const updated = [nextEntry, ...entries.filter((entry) => entry.date !== entryDate)]
-      .sort((a, b) => b.date.localeCompare(a.date));
-    persistEntries(updated);
-    setSaveFeedback(
-      `${copy.savedFor} ${formatDate(nextEntry.date, isHr)} ${copy.at} ${new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      })}.`
-    );
-    setIsSaving(false);
+      const updated = [saved, ...entries.filter((entry) => entry.date !== entryDate)]
+        .sort((a, b) => b.date.localeCompare(a.date));
+      setEntries(updated);
+      setSaveFeedback(
+        `${copy.savedFor} ${formatDate(saved.date, isHr)} ${copy.at} ${new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        })}.`
+      );
+    } catch {
+      setSaveFeedback(isHr ? 'Spremanje nije uspjelo.' : 'Could not save entry.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!entryTarget) return;
+
     const deletedDate = entryTarget.date;
-    const updated = entries.filter((entry) => entry.date !== entryDate);
-    persistEntries(updated);
-    setSaveFeedback(`${copy.deletedFor} ${formatDate(deletedDate, isHr)}.`);
+    try {
+      await deleteSymptomEntry(entryDate);
+      const updated = entries.filter((entry) => entry.date !== entryDate);
+      setEntries(updated);
+      setSaveFeedback(`${copy.deletedFor} ${formatDate(deletedDate, isHr)}.`);
+    } catch {
+      setSaveFeedback(isHr ? 'Brisanje nije uspjelo.' : 'Could not delete entry.');
+    }
   };
 
   if (!user) {
@@ -548,7 +561,7 @@ function Calendar({
           onClick={onPrevMonth}
           className="px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-300 hover:bg-slate-800 transition-colors"
         >
-          ‹
+          â€ą
         </button>
         <div className="text-sm font-medium text-slate-200">
           {monthStart.toLocaleDateString(isHr ? 'hr-HR' : 'en-US', { month: 'long', year: 'numeric' })}
@@ -559,7 +572,7 @@ function Calendar({
           disabled={currentMonthKey >= todayMonthKey}
           className="px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-300 hover:bg-slate-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          ›
+          â€ş
         </button>
       </div>
 
@@ -607,3 +620,4 @@ function Calendar({
     </div>
   );
 }
+

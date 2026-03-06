@@ -21,7 +21,7 @@ const cacheModules = (import.meta as any).glob('../nih_kb/cache/*.json', { eager
 // Build the internal list of chunks
 const kbChunks: Omit<RetrievedChunk, 'score'>[] = [];
 
-Object.entries(cacheModules).forEach(([path, module]) => {
+Object.values(cacheModules).forEach((module) => {
   const doc = module as CachedDoc;
   if (doc && doc.chunks && Array.isArray(doc.chunks)) {
     doc.chunks.forEach((chunkText, index) => {
@@ -72,3 +72,4 @@ export function generateNIHAnswer(query: string): { answer: string, citations: R
     citations: chunks
   };
 }
+

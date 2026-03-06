@@ -1,37 +1,14 @@
-import React, { useMemo } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, Download, FileText, Printer, Utensils, Wind } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { getBreathTests, getFoodLogs, getOnboardingData, getSymptomEntries } from '../services/healthApi';
 import { BreathTest } from '../types/breathTest';
-import { loadSymptomDiary } from '../utils/symptomDiaryStorage';
-
-interface OnboardingData {
-  primarySymptom?: string;
-  severity?: number;
-  stoolPattern?: string;
-  suspectedTriggers?: string;
-}
-
-interface LoggedFood {
-  id: string;
-  name: string;
-  amount: string;
-  status: 'safe' | 'caution' | 'trigger';
-  notes?: string;
-  createdAt: string;
-}
+import { LoggedFood, OnboardingData } from '../types/health';
+import { SymptomDiaryEntry } from '../types/symptomDiary';
 
 const SYMPTOM_FIELDS = ['pain', 'bloating', 'diarrhea', 'stress', 'sleep', 'energy', 'stool'] as const;
 type SymptomField = (typeof SYMPTOM_FIELDS)[number];
-
-function parseJson<T>(raw: string | null, fallback: T): T {
-  if (!raw) return fallback;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
 
 function toTimestamp(value?: string): number {
   const parsed = Date.parse(value ?? '');
@@ -74,7 +51,7 @@ function getBreathInterpretation(test: BreathTest, isHr: boolean) {
   if (!test.data || test.data.length === 0) {
     return {
       title: isHr ? 'Nedovoljno podataka' : 'Insufficient Data',
-      description: isHr ? 'Nema točki mjerenja u testu.' : 'No measurement points found in this test.',
+      description: isHr ? 'Nema toÄŤki mjerenja u testu.' : 'No measurement points found in this test.',
     };
   }
 
@@ -84,7 +61,7 @@ function getBreathInterpretation(test: BreathTest, isHr: boolean) {
 
   if (isH2Positive && isCH4Positive) {
     return {
-      title: isHr ? 'Mješoviti obrazac (H2 + CH4)' : 'Mixed Pattern (H2 + CH4)',
+      title: isHr ? 'MjeĹˇoviti obrazac (H2 + CH4)' : 'Mixed Pattern (H2 + CH4)',
       description: isHr
         ? `H2 porast je ${h2Rise} ppm, a CH4 vrh ${peakCH4} ppm.`
         : `H2 rise is ${h2Rise} ppm and CH4 peak is ${peakCH4} ppm.`,
@@ -110,7 +87,7 @@ function getBreathInterpretation(test: BreathTest, isHr: boolean) {
   return {
     title: isHr ? 'Normalan obrazac' : 'Normal Pattern',
     description: isHr
-      ? `Nema značajnog porasta (H2 < 20 ppm i CH4 < 10 ppm).`
+      ? `Nema znaÄŤajnog porasta (H2 < 20 ppm i CH4 < 10 ppm).`
       : `No significant rise detected (H2 < 20 ppm and CH4 < 10 ppm).`,
   };
 }
@@ -129,37 +106,37 @@ export default function DoctorReport() {
   const { isHr } = useLanguage();
 
   const copy = {
-    loginPrompt: isHr ? 'Prijavi se za pregled i izvoz personaliziranog izvještaja.' : 'Sign in to view and export your personalized report.',
-    title: isHr ? 'Personalizirani sažetak' : 'Personalized Summary',
+    loginPrompt: isHr ? 'Prijavi se za pregled i izvoz personaliziranog izvjeĹˇtaja.' : 'Sign in to view and export your personalized report.',
+    title: isHr ? 'Personalizirani saĹľetak' : 'Personalized Summary',
     subtitle: isHr
-      ? 'Jedna pregledna stranica za pacijenta i kliničara: baseline, simptomi, food triggeri i breath testovi.'
+      ? 'Jedna pregledna stranica za pacijenta i kliniÄŤara: baseline, simptomi, food triggeri i breath testovi.'
       : 'One clear page for patients and clinicians: baseline, symptoms, food triggers, and breath tests.',
     generatedOn: isHr ? 'Generirano' : 'Generated',
-    printPdf: isHr ? 'Ispiši / Spremi PDF' : 'Print / Save PDF',
+    printPdf: isHr ? 'IspiĹˇi / Spremi PDF' : 'Print / Save PDF',
     exportWord: isHr ? 'Preuzmi Word (.doc)' : 'Download Word (.doc)',
     patientInfo: isHr ? 'Podaci pacijenta' : 'Patient Information',
-    baseline: isHr ? 'Početni baseline (onboarding)' : 'Initial Baseline (Onboarding)',
+    baseline: isHr ? 'PoÄŤetni baseline (onboarding)' : 'Initial Baseline (Onboarding)',
     primarySymptom: isHr ? 'Primarni simptom' : 'Primary symptom',
-    severity: isHr ? 'Početna težina' : 'Initial severity',
+    severity: isHr ? 'PoÄŤetna teĹľina' : 'Initial severity',
     stoolPattern: isHr ? 'Uzorak stolice' : 'Stool pattern',
     suspectedTriggers: isHr ? 'Sumnjivi triggeri' : 'Suspected triggers',
     notProvided: isHr ? 'Nije uneseno' : 'Not provided',
-    symptomSummary: isHr ? 'Sažetak simptoma' : 'Symptom Summary',
+    symptomSummary: isHr ? 'SaĹľetak simptoma' : 'Symptom Summary',
     avgOverall: isHr ? 'Prosjek overall gut' : 'Average overall gut',
     latestOverall: isHr ? 'Zadnji overall gut' : 'Latest overall gut',
     totalLogs: isHr ? 'Ukupno symptom log unosa' : 'Total symptom log entries',
-    topBurdens: isHr ? 'Glavni simptom burden (niži score = gore)' : 'Main symptom burdens (lower score = worse)',
+    topBurdens: isHr ? 'Glavni simptom burden (niĹľi score = gore)' : 'Main symptom burdens (lower score = worse)',
     symptomAverages: isHr ? 'Prosjeci po simptomu' : 'Averages by symptom',
     recentSymptomLog: isHr ? 'Zadnji symptom log unosi' : 'Recent symptom log entries',
-    foodSummary: isHr ? 'Sažetak food triggera' : 'Food Trigger Summary',
-    topTriggers: isHr ? 'Najčešći triggeri' : 'Most frequent triggers',
-    triggerLog: isHr ? 'Trigger log (s bilješkama)' : 'Trigger log (with notes)',
-    breathSummary: isHr ? 'Breath test sažetak' : 'Breath Test Summary',
+    foodSummary: isHr ? 'SaĹľetak food triggera' : 'Food Trigger Summary',
+    topTriggers: isHr ? 'NajÄŤeĹˇÄ‡i triggeri' : 'Most frequent triggers',
+    triggerLog: isHr ? 'Trigger log (s biljeĹˇkama)' : 'Trigger log (with notes)',
+    breathSummary: isHr ? 'Breath test saĹľetak' : 'Breath Test Summary',
     latestBreath: isHr ? 'Zadnji breath test' : 'Latest breath test',
     noBreathTests: isHr ? 'Nema spremljenih breath testova.' : 'No saved breath tests.',
     breathHistory: isHr ? 'Povijest breath testova' : 'Breath test history',
     medicalNotice: isHr
-      ? 'Napomena: ovo je edukativni sažetak korisničkih unosa, nije dijagnoza.'
+      ? 'Napomena: ovo je edukativni saĹľetak korisniÄŤkih unosa, nije dijagnoza.'
       : 'Note: this is an educational summary of user-entered data, not a diagnosis.',
     noData: isHr ? 'Nema podataka' : 'No data',
     date: isHr ? 'Datum' : 'Date',
@@ -167,7 +144,7 @@ export default function DoctorReport() {
     pain: isHr ? 'Bol' : 'Pain',
     bloating: isHr ? 'Nadutost' : 'Bloating',
     stress: isHr ? 'Stres' : 'Stress',
-    notes: isHr ? 'Bilješke' : 'Notes',
+    notes: isHr ? 'BiljeĹˇke' : 'Notes',
     food: isHr ? 'Hrana' : 'Food',
     substrate: isHr ? 'Supstrat' : 'Substrate',
     h2Rise: isHr ? 'H2 porast' : 'H2 rise',
@@ -175,27 +152,52 @@ export default function DoctorReport() {
     interpretation: isHr ? 'Interpretacija' : 'Interpretation',
   };
 
-  const onboarding = useMemo(() => {
-    if (!user) return null;
-    return parseJson<OnboardingData>(localStorage.getItem(`sibolytics_onboarding_${user.id}`), {});
-  }, [user]);
+  const [onboarding, setOnboarding] = useState<OnboardingData>({});
+  const [symptomEntries, setSymptomEntries] = useState<SymptomDiaryEntry[]>([]);
+  const [foodLogs, setFoodLogs] = useState<LoggedFood[]>([]);
+  const [breathTests, setBreathTests] = useState<BreathTest[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
-  const symptomEntries = useMemo(() => {
-    if (!user) return [];
-    return loadSymptomDiary(user.id);
-  }, [user]);
+  useEffect(() => {
+    if (!user) {
+      setOnboarding({});
+      setSymptomEntries([]);
+      setFoodLogs([]);
+      setBreathTests([]);
+      setLoadError('');
+      setIsLoading(false);
+      return;
+    }
 
-  const foodLogs = useMemo(() => {
-    if (!user) return [] as LoggedFood[];
-    const parsed = parseJson<LoggedFood[]>(localStorage.getItem(`sibolytics_foodlog_${user.id}`), []);
-    return [...parsed].sort((a, b) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt));
-  }, [user]);
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        const [onboardingData, symptoms, foods, tests] = await Promise.all([
+          getOnboardingData(),
+          getSymptomEntries(),
+          getFoodLogs(),
+          getBreathTests(),
+        ]);
 
-  const breathTests = useMemo(() => {
-    if (!user) return [] as BreathTest[];
-    const parsed = parseJson<BreathTest[]>(localStorage.getItem(`sibolytics_breathtests_${user.id}`), []);
-    return [...parsed].sort((a, b) => getBreathTestTimestamp(b) - getBreathTestTimestamp(a));
-  }, [user]);
+        setOnboarding(onboardingData ?? {});
+        setSymptomEntries(symptoms);
+        setFoodLogs([...foods].sort((a, b) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt)));
+        setBreathTests([...tests].sort((a, b) => getBreathTestTimestamp(b) - getBreathTestTimestamp(a)));
+        setLoadError('');
+      } catch {
+        setOnboarding({});
+        setSymptomEntries([]);
+        setFoodLogs([]);
+        setBreathTests([]);
+        setLoadError(isHr ? 'Ucavanje izvjestaja nije uspjelo.' : 'Could not load report data.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadData();
+  }, [user, isHr]);
 
   const suspectedTriggerList = useMemo(() => {
     const raw = onboarding?.suspectedTriggers ?? '';
@@ -444,6 +446,14 @@ export default function DoctorReport() {
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 text-sm text-slate-300">
+        {isHr ? 'Ucavanje izvjestaja...' : 'Loading summary...'}
+      </div>
+    );
+  }
+
   return (
     <div className="summary-page space-y-8">
       <style>{`
@@ -482,6 +492,12 @@ export default function DoctorReport() {
           }
         }
       `}</style>
+
+      {loadError && (
+        <div className="no-print text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
+          {loadError}
+        </div>
+      )}
 
       <section className="no-print bg-gradient-to-r from-sky-900/35 via-indigo-900/30 to-slate-900/45 border border-sky-800/35 rounded-3xl p-6 shadow-lg shadow-slate-950/20">
         <h2 className="text-2xl font-semibold text-white">{copy.title}</h2>
@@ -768,3 +784,4 @@ export default function DoctorReport() {
     </div>
   );
 }
+

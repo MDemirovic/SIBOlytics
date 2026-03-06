@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Activity, Plus, AlertCircle, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { createBreathTest, deleteBreathTest, getBreathTests } from '../services/healthApi';
 import { BreathTest } from '../types/breathTest';
 import BreathChart from '../components/breath/BreathChart';
 import TestHistory from '../components/breath/TestHistory';
@@ -14,6 +15,7 @@ export default function BreathTests() {
   const [selectedTestId, setSelectedTestId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
   const copy = {
     insufficient: isHr ? 'Nedovoljno podataka' : 'Insufficient Data',
@@ -43,19 +45,30 @@ export default function BreathTests() {
     testFrom: isHr ? 'test od' : 'test from',
     cancel: isHr ? 'Odustani' : 'Cancel',
     deleteTest: isHr ? 'Obrisi test' : 'Delete Test',
+    loadError: isHr ? 'Ucavanje testova nije uspjelo.' : 'Could not load breath tests.',
+    saveError: isHr ? 'Spremanje testa nije uspjelo.' : 'Could not save breath test.',
+    deleteError: isHr ? 'Brisanje testa nije uspjelo.' : 'Could not delete breath test.',
   };
 
   useEffect(() => {
-    if (user) {
-      const storedTests = localStorage.getItem(`sibolytics_breathtests_${user.id}`);
-      if (storedTests) {
-        const parsed: BreathTest[] = JSON.parse(storedTests);
-        setTests(parsed);
-      } else {
-        setTests([]);
-      }
+    if (!user) {
+      setTests([]);
+      return;
     }
-  }, [user]);
+
+    const loadTests = async () => {
+      try {
+        const loaded = await getBreathTests();
+        setTests(loaded);
+        setError('');
+      } catch {
+        setTests([]);
+        setError(copy.loadError);
+      }
+    };
+
+    void loadTests();
+  }, [user, copy.loadError]);
 
   useEffect(() => {
     if (tests.length === 0) {
@@ -69,38 +82,38 @@ export default function BreathTests() {
     }
   }, [tests, selectedTestId]);
 
-  const saveTests = (newTests: BreathTest[]) => {
-    setTests(newTests);
-    if (user) {
-      localStorage.setItem(`sibolytics_breathtests_${user.id}`, JSON.stringify(newTests));
+  const handleSaveTest = async (testData: Omit<BreathTest, 'id' | 'createdAt'>) => {
+    try {
+      const newTest = await createBreathTest(testData);
+      const updatedTests = [newTest, ...tests];
+      setTests(updatedTests);
+      setSelectedTestId(newTest.id);
+      setIsAdding(false);
+      setError('');
+    } catch {
+      setError(copy.saveError);
     }
-  };
-
-  const handleSaveTest = (testData: Omit<BreathTest, 'id' | 'createdAt'>) => {
-    const newTest: BreathTest = {
-      ...testData,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-    };
-    const updatedTests = [newTest, ...tests];
-    saveTests(updatedTests);
-    setSelectedTestId(newTest.id);
-    setIsAdding(false);
   };
 
   const handleDeleteTest = (id: string) => {
     setDeleteCandidateId(id);
   };
 
-  const confirmDeleteTest = () => {
+  const confirmDeleteTest = async () => {
     if (!deleteCandidateId) return;
 
-    const updatedTests = tests.filter((t) => t.id !== deleteCandidateId);
-    saveTests(updatedTests);
-    if (selectedTestId === deleteCandidateId) {
-      setSelectedTestId(updatedTests.length > 0 ? updatedTests[0].id : null);
+    try {
+      await deleteBreathTest(deleteCandidateId);
+      const updatedTests = tests.filter((t) => t.id !== deleteCandidateId);
+      setTests(updatedTests);
+      if (selectedTestId === deleteCandidateId) {
+        setSelectedTestId(updatedTests.length > 0 ? updatedTests[0].id : null);
+      }
+      setDeleteCandidateId(null);
+      setError('');
+    } catch {
+      setError(copy.deleteError);
     }
-    setDeleteCandidateId(null);
   };
 
   const getInterpretation = (test: BreathTest) => {
@@ -153,6 +166,12 @@ export default function BreathTests() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
+          {error}
+        </div>
+      )}
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-medium text-white">{copy.yourTests}</h2>
@@ -301,3 +320,4 @@ export default function BreathTests() {
     </div>
   );
 }
+

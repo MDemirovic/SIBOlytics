@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Search, AlertCircle, CheckCircle2, AlertTriangle, Plus, Trash2 } from 'lucide-react';
 import { foods, FoodItem } from '../data/foods_from_pdf';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { createFoodLog, deleteFoodLog, getFoodLogs } from '../services/healthApi';
 
 interface LoggedFood {
   id: string;
@@ -14,16 +15,16 @@ interface LoggedFood {
 }
 
 const HR_FOOD_CATEGORY_MAP: Record<string, string> = {
-  Fruits: 'Voće',
-  Vegetables: 'Povrće',
+  Fruits: 'VoÄ‡e',
+  Vegetables: 'PovrÄ‡e',
   'Nuts and Seeds': 'Orasasti plodovi i sjemenke',
-  'Grains and Starches': 'Žitarice i škrob',
+  'Grains and Starches': 'Ĺ˝itarice i Ĺˇkrob',
   Proteins: 'Proteini',
-  'Dairy / Dairy Alternatives': 'Mliječni proizvodi / zamjene',
-  Beverages: 'Pića',
+  'Dairy / Dairy Alternatives': 'MlijeÄŤni proizvodi / zamjene',
+  Beverages: 'PiÄ‡a',
   'Fats and Oils': 'Masti i ulja',
-  'Condiments, Seasonings, and Baking Supplies': 'Dodaci, začini i sastojci za pečenje',
-  Sweeteners: 'Zaslađivači',
+  'Condiments, Seasonings, and Baking Supplies': 'Dodaci, zaÄŤini i sastojci za peÄŤenje',
+  Sweeteners: 'ZaslaÄ‘ivaÄŤi',
   'Sweets and Desserts': 'Slatko i deserti',
   'High-FODMAP Checklist': 'Visoki FODMAP popis',
 };
@@ -167,7 +168,7 @@ const HR_FOOD_NAME_MAP: Record<string, string> = {
   Apples: 'Jabuke',
   apricots: 'Marelice',
   Artichokes: 'Articoke',
-  'Artificial sweeteners not ending in “-ol”': 'Umjetna sladila koja ne zavrsavaju na "-ol"',
+  'Artificial sweeteners not ending in â€ś-olâ€ť': 'Umjetna sladila koja ne zavrsavaju na "-ol"',
   Asparagus: 'Sparoge',
   Aspartame: 'Aspartam',
   'baked beans': 'Peceni grah',
@@ -417,6 +418,7 @@ export default function FoodHub() {
   const [isAddingFood, setIsAddingFood] = useState(false);
   const [newFood, setNewFood] = useState({ name: '', amount: '', status: 'safe' as const, notes: '' });
   const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
   const copy = {
     title: isHr ? 'Prehrana' : 'Food Hub',
@@ -425,8 +427,8 @@ export default function FoodHub() {
       : 'A low FODMAP diet temporarily reduces certain fermentable carbohydrates to help identify symptom triggers and manage digestive discomfort. Use this database during your elimination phase, then gradually reintroduce foods one by one.',
     tabDatabase: isHr ? 'Low FODMAP baza' : 'Low FODMAP Database',
     tabLog: isHr ? 'Osobni dnevnik hrane' : 'Personal Food Log',
-    searchFoods: isHr ? 'Pretraži namirnice...' : 'Search foods...',
-    searchLog: isHr ? 'Pretraži dnevnik...' : 'Search your log...',
+    searchFoods: isHr ? 'PretraĹľi namirnice...' : 'Search foods...',
+    searchLog: isHr ? 'PretraĹľi dnevnik...' : 'Search your log...',
     filters: isHr ? 'Filteri' : 'Filters',
     level: isHr ? 'FODMAP razina' : 'FODMAP Level',
     lowSafe: isHr ? 'Nisko (sigurno)' : 'Low (safe)',
@@ -434,66 +436,87 @@ export default function FoodHub() {
     high: isHr ? 'Visoko' : 'High',
     noFoods: isHr ? 'Nema namirnica za odabrane filtere.' : 'No foods found matching your filters.',
     addFood: isHr ? 'Dodaj hranu' : 'Add Food',
-    noLogs: isHr ? 'Još nema unosa hrane. Dodaj prvi unos.' : 'No foods logged yet. Add your first food.',
-    amount: isHr ? 'Količina' : 'Amount',
+    noLogs: isHr ? 'JoĹˇ nema unosa hrane. Dodaj prvi unos.' : 'No foods logged yet. Add your first food.',
+    amount: isHr ? 'KoliÄŤina' : 'Amount',
     limitTo: isHr ? 'Limit' : 'Limit to',
     modalTitle: isHr ? 'Dodaj osobni unos hrane' : 'Log Personal Food',
     foodName: isHr ? 'Naziv hrane *' : 'Food Name *',
-    amountReq: isHr ? 'Količina *' : 'Amount *',
+    amountReq: isHr ? 'KoliÄŤina *' : 'Amount *',
     reactionStatus: isHr ? 'Status reakcije *' : 'Reaction Status *',
-    notes: isHr ? 'Bilješke (opcionalno)' : 'Notes (Optional)',
+    notes: isHr ? 'BiljeĹˇke (opcionalno)' : 'Notes (Optional)',
     cancel: isHr ? 'Odustani' : 'Cancel',
     saveFood: isHr ? 'Spremi hranu' : 'Save Food',
     safeGreen: isHr ? 'Sigurno (zeleno)' : 'Safe (Green)',
-    cautionOrange: isHr ? 'Oprez (narančasto)' : 'Caution (Orange)',
+    cautionOrange: isHr ? 'Oprez (naranÄŤasto)' : 'Caution (Orange)',
     triggerRed: isHr ? 'Trigger (crveno)' : 'Trigger (Red)',
     deleteTitle: isHr ? 'Obrisati ovaj unos hrane?' : 'Delete this food log?',
-    deleteTextA: isHr ? 'Ova radnja se ne može poništiti. Brišeš' : 'This action cannot be undone. You are deleting',
+    deleteTextA: isHr ? 'Ova radnja se ne moĹľe poniĹˇtiti. BriĹˇeĹˇ' : 'This action cannot be undone. You are deleting',
     deleteTextB: isHr ? 'iz osobnog dnevnika.' : 'from your personal log.',
-    deleteFood: isHr ? 'Obriši hranu' : 'Delete Food',
+    deleteFood: isHr ? 'ObriĹˇi hranu' : 'Delete Food',
     lowFodmap: isHr ? 'Niski FODMAP' : 'Low FODMAP',
     highFodmap: isHr ? 'Visoki FODMAP' : 'High FODMAP',
     safe: isHr ? 'Sigurno' : 'Safe',
     caution: isHr ? 'Oprez' : 'Caution',
     trigger: 'Trigger',
+    loadError: isHr ? 'Ucavanje dnevnika hrane nije uspjelo.' : 'Could not load food log.',
+    saveError: isHr ? 'Spremanje hrane nije uspjelo.' : 'Could not save food log.',
+    deleteError: isHr ? 'Brisanje hrane nije uspjelo.' : 'Could not delete food log.',
   };
 
   useEffect(() => {
-    if (user) {
-      const stored = localStorage.getItem(`sibolytics_foodlog_${user.id}`);
-      if (stored) {
-        setLoggedFoods(JSON.parse(stored));
+    if (!user) {
+      setLoggedFoods([]);
+      return;
+    }
+
+    const loadFoods = async () => {
+      try {
+        const loaded = await getFoodLogs();
+        setLoggedFoods(loaded);
+        setError('');
+      } catch {
+        setLoggedFoods([]);
+        setError(copy.loadError);
       }
-    }
-  }, [user]);
-
-  const saveLoggedFoods = (newFoods: LoggedFood[]) => {
-    setLoggedFoods(newFoods);
-    if (user) {
-      localStorage.setItem(`sibolytics_foodlog_${user.id}`, JSON.stringify(newFoods));
-    }
-  };
-
-  const handleAddFood = (e: React.FormEvent) => {
-    e.preventDefault();
-    const food: LoggedFood = {
-      ...newFood,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
     };
-    saveLoggedFoods([food, ...loggedFoods]);
-    setIsAddingFood(false);
-    setNewFood({ name: '', amount: '', status: 'safe', notes: '' });
+
+    void loadFoods();
+  }, [user, copy.loadError]);
+
+  const handleAddFood = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      const food = await createFoodLog({
+        name: newFood.name,
+        amount: newFood.amount,
+        status: newFood.status,
+        notes: newFood.notes,
+      });
+      setLoggedFoods([food, ...loggedFoods]);
+      setIsAddingFood(false);
+      setNewFood({ name: '', amount: '', status: 'safe', notes: '' });
+      setError('');
+    } catch {
+      setError(copy.saveError);
+    }
   };
 
   const handleDeleteFood = (id: string) => {
     setDeleteCandidateId(id);
   };
 
-  const confirmDeleteFood = () => {
+  const confirmDeleteFood = async () => {
     if (!deleteCandidateId) return;
-    saveLoggedFoods(loggedFoods.filter((f) => f.id !== deleteCandidateId));
-    setDeleteCandidateId(null);
+
+    try {
+      await deleteFoodLog(deleteCandidateId);
+      setLoggedFoods(loggedFoods.filter((f) => f.id !== deleteCandidateId));
+      setDeleteCandidateId(null);
+      setError('');
+    } catch {
+      setError(copy.deleteError);
+    }
   };
 
   const foldedQuery = foldSearchText(searchQuery);
@@ -571,6 +594,12 @@ export default function FoodHub() {
         <h1 className="text-3xl font-semibold tracking-tight text-white mb-2">{copy.title}</h1>
         <p className="text-slate-400 max-w-3xl">{copy.subtitle}</p>
       </header>
+
+      {error && (
+        <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
+          {error}
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800 w-full sm:w-auto shrink-0">
@@ -851,4 +880,5 @@ export default function FoodHub() {
     </div>
   );
 }
+
 
