@@ -1,5 +1,6 @@
 export interface SymptomDiaryEntry {
   id: string;
+  userId?: string;
   date: string; // YYYY-MM-DD (local date)
   stress: number;
   overallGut: number;
@@ -13,3 +14,4 @@ export interface SymptomDiaryEntry {
   createdAt: string;
   updatedAt: string;
 }
+

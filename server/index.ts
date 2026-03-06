@@ -1,4 +1,4 @@
-﻿import 'dotenv/config';
+import 'dotenv/config';
 import crypto from 'node:crypto';
 import express, {NextFunction, Request, Response} from 'express';
 import {Pool} from 'pg';
@@ -238,7 +238,7 @@ function clampNonNegative(value: unknown): number | null {
 
 function normalizeNotes(value: unknown): string {
   if (typeof value !== 'string') return '';
-  return value.trim().slice(0, 4000);
+  return value.slice(0, 4000);
 }
 
 function parseSymptomScores(payload: any): SymptomScores | null {
@@ -326,10 +326,31 @@ function requireUser(req: AuthenticatedRequest, res: Response): SafeUser | null 
   return req.user;
 }
 
+function toDateKey(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (isDateKey(trimmed)) return trimmed;
+    if (trimmed.length >= 10 && isDateKey(trimmed.slice(0, 10))) return trimmed.slice(0, 10);
+    const parsed = new Date(trimmed);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  }
+
+  return null;
+}
+
 function mapSymptomRow(row: any) {
+  const dateKey = toDateKey(row.entry_date) ?? toDateKey(row.date) ?? toDateKey(new Date())!;
+
   return {
     id: String(row.id),
-    date: String(row.entry_date).slice(0, 10),
+    userId: String(row.user_id),
+    date: dateKey,
     pain: Number(row.pain),
     stress: Number(row.stress),
     sleep: Number(row.sleep),
@@ -356,10 +377,12 @@ function mapFoodRow(row: any) {
 }
 
 function mapBreathTestRow(row: any, points: BreathPointInput[]) {
+  const testDate = toDateKey(row.test_date) ?? undefined;
+
   return {
     id: String(row.id),
     createdAt: new Date(row.created_at).toISOString(),
-    testDate: row.test_date ? String(row.test_date).slice(0, 10) : undefined,
+    testDate,
     substrate: String(row.substrate) as BreathSubstrate,
     units: String(row.units) as BreathUnits,
     notes: String(row.notes ?? ''),
@@ -583,7 +606,7 @@ app.get('/api/symptoms', requireAuth, async (req: AuthenticatedRequest, res) => 
 
   const result = await pool.query(
     `
-    SELECT id, entry_date, pain, stress, sleep, stool, bloating, diarrhea, energy, overall_gut, notes, created_at, updated_at
+    SELECT id, user_id, entry_date, pain, stress, sleep, stool, bloating, diarrhea, energy, overall_gut, notes, created_at, updated_at
     FROM symptom_entries
     WHERE user_id = $1
     ORDER BY entry_date DESC, updated_at DESC
@@ -634,7 +657,7 @@ app.put('/api/symptoms/:date', requireAuth, async (req: AuthenticatedRequest, re
       overall_gut = EXCLUDED.overall_gut,
       notes = EXCLUDED.notes,
       updated_at = NOW()
-    RETURNING id, entry_date, pain, stress, sleep, stool, bloating, diarrhea, energy, overall_gut, notes, created_at, updated_at
+    RETURNING id, user_id, entry_date, pain, stress, sleep, stool, bloating, diarrhea, energy, overall_gut, notes, created_at, updated_at
     `,
     [
       user.id,
@@ -916,3 +939,5 @@ startServer().catch((error) => {
   console.error('Failed to start API server:', error);
   process.exit(1);
 });
+
+

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -43,7 +43,17 @@ const EMPTY_FORM: SymptomFormState = {
 };
 
 function formatDate(date: string, isHr: boolean) {
-  return new Date(`${date}T00:00:00`).toLocaleDateString(isHr ? 'hr-HR' : 'en-US');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return isHr ? 'Nepoznat datum' : 'Unknown date';
+  }
+
+  const [year, month, day] = date.split('-').map(Number);
+  const parsed = new Date(year, month - 1, day);
+  if (Number.isNaN(parsed.getTime())) {
+    return isHr ? 'Nepoznat datum' : 'Unknown date';
+  }
+
+  return parsed.toLocaleDateString(isHr ? 'hr-HR' : 'en-US');
 }
 
 function getMonthStart(date: Date): Date {
@@ -126,29 +136,29 @@ export default function SymptomDiary() {
   const previousTodayKeyRef = useRef(todayKey);
 
   const copy = {
-    loginPrompt: isHr ? 'Prijavi se za koriĹˇtenje Dnevnika simptoma.' : 'Sign in to use Symptom Diary.',
+    loginPrompt: isHr ? 'Prijavi se za korištenje Dnevnika simptoma.' : 'Sign in to use Symptom Diary.',
     todayIs: isHr ? 'Danas je' : 'Today is',
-    editingToday: isHr ? 'Trenutno ureÄ‘ujeĹˇ danas. MoguÄ‡ je samo jedan unos dnevno.' : 'You are currently editing today. One entry per day is enforced.',
-    viewingDay: isHr ? 'PregledavaĹˇ' : 'You are viewing',
+    editingToday: isHr ? 'Trenutno uređuješ danas. Moguć je samo jedan unos dnevno.' : 'You are currently editing today. One entry per day is enforced.',
+    viewingDay: isHr ? 'Pregledavaš' : 'You are viewing',
     returnToday: isHr ? 'Klikni "Danas" za povratak.' : 'Click "Today" to return.',
     today: isHr ? 'Danas' : 'Today',
     savedEntries: isHr ? 'Spremljeni dnevni unosi' : 'Saved Daily Entries',
     total: isHr ? 'ukupno' : 'total',
-    noEntries: isHr ? 'JoĹˇ nema unosa. Klikni "Danas" i spremi simptome.' : 'No entries yet. Click "Today" and save symptoms.',
+    noEntries: isHr ? 'Još nema unosa. Klikni "Danas" i spremi simptome.' : 'No entries yet. Click "Today" and save symptoms.',
     pain: isHr ? 'Bol' : 'Pain',
     stress: isHr ? 'Stres' : 'Stress',
     energy: isHr ? 'Energija' : 'Energy',
-    titleToday: isHr ? 'DanaĹˇnji simptomi' : "Today's Symptoms",
+    titleToday: isHr ? 'Današnji simptomi' : "Today's Symptoms",
     titleDaily: isHr ? 'Dnevni simptomi' : 'Daily Symptoms',
     titleAdd: isHr ? 'Dodaj simptome' : 'Add symptoms',
-    scaleText: isHr ? '1 je najgore (crveno), 10 je najbolje (zeleno). Spremi za novi unos ili aĹľuriranje dana.' : '1 is worst (red), 10 is best (green). Save to create or update this day.',
-    overall: isHr ? 'IzraÄŤunati ukupni dan' : 'Calculated overall day',
-    notes: isHr ? 'BiljeĹˇke' : 'Notes',
-    notesPlaceholder: isHr ? 'Opcionalne biljeĹˇke...' : 'Optional notes...',
-    delete: isHr ? 'ObriĹˇi' : 'Delete',
+    scaleText: isHr ? '1 je najgore (crveno), 10 je najbolje (zeleno). Spremi za novi unos ili ažuriranje dana.' : '1 is worst (red), 10 is best (green). Save to create or update this day.',
+    overall: isHr ? 'Izračunati ukupni dan' : 'Calculated overall day',
+    notes: isHr ? 'Bilješke' : 'Notes',
+    notesPlaceholder: isHr ? 'Opcionalne bilješke...' : 'Optional notes...',
+    delete: isHr ? 'Obriši' : 'Delete',
     saving: isHr ? 'Spremanje...' : 'Saving...',
-    updateToday: isHr ? 'AĹľuriraj danas' : 'Update Today',
-    updateDay: isHr ? 'AĹľuriraj odabrani dan' : 'Update Selected Day',
+    updateToday: isHr ? 'Ažuriraj danas' : 'Update Today',
+    updateDay: isHr ? 'Ažuriraj odabrani dan' : 'Update Selected Day',
     saveToday: isHr ? 'Spremi danas' : 'Save Today',
     saveDay: isHr ? 'Spremi odabrani dan' : 'Save Selected Day',
     savedFor: isHr ? 'Spremljeno za' : 'Saved for',
@@ -276,7 +286,7 @@ export default function SymptomDiary() {
         bloating: form.bloating,
         diarrhea: form.diarrhea,
         energy: form.energy,
-        notes: form.notes.trim(),
+        notes: form.notes,
       });
 
       const updated = [saved, ...entries.filter((entry) => entry.date !== entryDate)]
@@ -561,7 +571,7 @@ function Calendar({
           onClick={onPrevMonth}
           className="px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-300 hover:bg-slate-800 transition-colors"
         >
-          â€ą
+          ‹
         </button>
         <div className="text-sm font-medium text-slate-200">
           {monthStart.toLocaleDateString(isHr ? 'hr-HR' : 'en-US', { month: 'long', year: 'numeric' })}
@@ -572,7 +582,7 @@ function Calendar({
           disabled={currentMonthKey >= todayMonthKey}
           className="px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-300 hover:bg-slate-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          â€ş
+          ›
         </button>
       </div>
 

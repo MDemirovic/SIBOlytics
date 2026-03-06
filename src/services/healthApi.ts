@@ -1,4 +1,4 @@
-﻿import { BreathTest } from '../types/breathTest';
+import { BreathTest } from '../types/breathTest';
 import { LoggedFood, OnboardingData } from '../types/health';
 import { SymptomDiaryEntry } from '../types/symptomDiary';
 
@@ -25,6 +25,102 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim
 function apiUrl(path: string) {
   if (!API_BASE) return path;
   return `${API_BASE}${path}`;
+}
+
+function clampScore(value: unknown, fallback = 5): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  const rounded = Math.round(parsed);
+  if (rounded < 1) return 1;
+  if (rounded > 10) return 10;
+  return rounded;
+}
+
+function normalizeDateKey(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    if (trimmed.length >= 10 && /^\d{4}-\d{2}-\d{2}$/.test(trimmed.slice(0, 10))) return trimmed.slice(0, 10);
+
+    const parsed = new Date(trimmed);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  }
+
+  return null;
+}
+
+function normalizeIsoTimestamp(value: unknown): string {
+  if (typeof value === 'string' || value instanceof Date) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString();
+    }
+  }
+
+  return new Date().toISOString();
+}
+
+function mapSymptomEntry(raw: any): SymptomDiaryEntry | null {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const date = normalizeDateKey(raw.date ?? raw.entryDate ?? raw.entry_date);
+  if (!date) return null;
+
+  const pain = clampScore(raw.pain);
+  const stress = clampScore(raw.stress);
+  const sleep = clampScore(raw.sleep);
+  const stool = clampScore(raw.stool);
+  const bloating = clampScore(raw.bloating);
+  const diarrhea = clampScore(raw.diarrhea);
+  const energy = clampScore(raw.energy);
+  const fallbackOverall = Math.round((pain + stress + sleep + stool + bloating + diarrhea + energy) / 7);
+  const overallGut = clampScore(raw.overallGut ?? raw.overall_gut, fallbackOverall);
+
+  const createdAt = normalizeIsoTimestamp(raw.createdAt ?? raw.created_at);
+  const updatedAt = normalizeIsoTimestamp(raw.updatedAt ?? raw.updated_at ?? createdAt);
+  const userId = raw.userId ?? raw.user_id;
+
+  return {
+    id: String(raw.id ?? `${date}-${updatedAt}`),
+    userId: userId === undefined || userId === null ? undefined : String(userId),
+    date,
+    pain,
+    stress,
+    sleep,
+    stool,
+    bloating,
+    diarrhea,
+    energy,
+    overallGut,
+    notes: typeof raw.notes === 'string' ? raw.notes : '',
+    createdAt,
+    updatedAt,
+  };
+}
+
+function normalizeSymptomEntries(raw: unknown): SymptomDiaryEntry[] {
+  if (!Array.isArray(raw)) return [];
+
+  const mapped = raw
+    .map((entry) => mapSymptomEntry(entry))
+    .filter((entry): entry is SymptomDiaryEntry => entry !== null)
+    .sort((a, b) => {
+      if (a.date === b.date) return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+      return b.date.localeCompare(a.date);
+    });
+
+  const seen = new Set<string>();
+  return mapped.filter((entry) => {
+    if (seen.has(entry.date)) return false;
+    seen.add(entry.date);
+    return true;
+  });
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -64,15 +160,23 @@ export function getOnboardingData() {
   return request<OnboardingData>('/api/onboarding', { method: 'GET' });
 }
 
-export function getSymptomEntries() {
-  return request<SymptomDiaryEntry[]>('/api/symptoms', { method: 'GET' });
+export async function getSymptomEntries() {
+  const raw = await request<unknown>('/api/symptoms', { method: 'GET' });
+  return normalizeSymptomEntries(raw);
 }
 
-export function upsertSymptomEntry(date: string, payload: SymptomEntryInput) {
-  return request<SymptomDiaryEntry>(`/api/symptoms/${encodeURIComponent(date)}`, {
+export async function upsertSymptomEntry(date: string, payload: SymptomEntryInput) {
+  const raw = await request<unknown>(`/api/symptoms/${encodeURIComponent(date)}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
   });
+
+  const mapped = mapSymptomEntry(raw);
+  if (!mapped) {
+    throw new Error('Invalid symptom entry payload from server.');
+  }
+
+  return mapped;
 }
 
 export function deleteSymptomEntry(date: string) {
@@ -114,3 +218,4 @@ export function deleteBreathTest(id: string) {
     method: 'DELETE',
   });
 }
+
