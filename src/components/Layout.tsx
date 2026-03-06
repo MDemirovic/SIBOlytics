@@ -238,7 +238,7 @@ export default function Layout() {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-slate-900/95 backdrop-blur-xl border-r border-slate-800 flex flex-col overflow-y-auto transform transition-transform duration-200 md:static md:z-auto md:w-64 md:max-w-none md:bg-slate-900/50 md:border-b-0 md:translate-x-0 ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-slate-900/95 backdrop-blur-xl border-r border-slate-800 flex flex-col overflow-y-auto sidebar-no-scrollbar transform transition-transform duration-200 md:static md:z-auto md:w-64 md:max-w-none md:bg-slate-900/50 md:border-b-0 md:translate-x-0 ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
       >
         <div className="p-4 md:hidden flex justify-end">
