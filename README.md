@@ -1,49 +1,53 @@
 # SIBOlytics
 
-SIBOlytics is a frontend-only preview app for tracking SIBO-related data: breath tests, food tolerance, and educational insights in one place.
+SIBOlytics is a full-stack app (React + Express + Postgres) for SIBO tracking.
 
-## Features
+## Stack
+- Frontend: React, TypeScript, Vite, Tailwind
+- Backend: Express, TypeScript
+- Database: Postgres (Neon for free launch)
 
-- Preview signup and login (local, no backend)
-- Onboarding flow with suspected trigger capture
-- Breath test upload/manual entry and chart visualization
-- Low FODMAP database browsing and filtering
-- Personal food log (symptom/trigger tracking)
-- NIH Evidence Bot with local retrieval and citations
-
-## Current Data Model
-
-- **Auth and account data**: stored in browser localStorage (per device)
-- **Breath tests and food log**: stored in browser localStorage (per user)
-- **NIH knowledge base**: static JSON cache bundled at build time
-
-> Note: data is not synced across devices and can be cleared by the user at any time.
-
-## Tech Stack
-
-- Frontend: React, TypeScript, Vite, Tailwind, Recharts
-- Local storage: browser localStorage
-- Retrieval: simple local term matching against cached NIH sources
-
-## Getting Started
+## Local Setup
 
 ### 1) Install
 ```bash
-npm install
+npm ci
 ```
 
-### 2) Run locally
+### 2) Create env file
+Copy `.env.example` to `.env` and set:
+- `DATABASE_URL`
+- `API_PORT` (optional, default backend port is `3001`)
+
+### 3) Run backend
 ```bash
-npm run dev
+npm run dev:server
 ```
 
-## Deployment (GitHub Pages)
-
-This project is configured to deploy with GitHub Actions. The base URL is set automatically for GitHub Pages builds.
-
-Environment variables (optional):
-```env
-VITE_BASE_URL=/SIBOlytics/
+### 4) Run frontend
+```bash
+npm run dev:client
 ```
 
-If you change the repo name, the GitHub Actions workflow sets the correct base path automatically.
+Open `http://localhost:3000`.
+
+## Production Launch (Render + Neon)
+
+### Render commands
+- Build command: `npm ci && npm run build`
+- Start command: `npm run start`
+
+### Required env on Render
+- `DATABASE_URL=<your_neon_connection_string>`
+- `NODE_ENV=production`
+- `VITE_BASE_URL=/`
+
+In production mode, backend serves both:
+- API (`/api/*`)
+- frontend static build from `dist`
+
+This keeps frontend + API on one URL and avoids CORS/cookie issues.
+
+## GitHub Pages
+
+`.github/workflows/deploy-pages.yml` is now manual-only (`workflow_dispatch`) so Pages deploy does not run on every push.

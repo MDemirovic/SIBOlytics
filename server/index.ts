@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import crypto from 'node:crypto';
+import {existsSync} from 'node:fs';
+import path from 'node:path';
 import express, {NextFunction, Request, Response} from 'express';
 import {Pool} from 'pg';
 
@@ -43,6 +45,7 @@ const databaseUrl = process.env.DATABASE_URL;
 const sessionCookieName = 'sibolytics_session';
 const sessionDurationDays = 7;
 const isProduction = process.env.NODE_ENV === 'production';
+const clientDistPath = path.resolve(process.cwd(), 'dist');
 
 if (!databaseUrl) {
   throw new Error('Missing DATABASE_URL in environment variables.');
@@ -923,6 +926,20 @@ app.delete('/api/auth/account', requireAuth, async (req: AuthenticatedRequest, r
   res.json({success: true});
 });
 
+app.use('/api', (_req, res) => {
+  res.status(404).json({success: false, error: 'Not found.'});
+});
+
+if (isProduction) {
+  if (!existsSync(clientDistPath)) {
+    console.warn(`Missing frontend build at ${clientDistPath}. Run "npm run build" before "npm run start".`);
+  } else {
+    app.use(express.static(clientDistPath));
+    app.get(/^\/(?!api(?:\/|$)).*/, (_req, res) => {
+      res.sendFile(path.join(clientDistPath, 'index.html'));
+    });
+  }
+}
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error(error);
   res.status(500).json({success: false, error: 'Server error.'});
@@ -931,7 +948,7 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 async function startServer() {
   await pool.query(initSql);
   app.listen(port, () => {
-    console.log(`API listening on http://127.0.0.1:${port}`);
+    console.log(`Server listening on http://127.0.0.1:${port}`);
   });
 }
 
@@ -939,5 +956,6 @@ startServer().catch((error) => {
   console.error('Failed to start API server:', error);
   process.exit(1);
 });
+
 
 

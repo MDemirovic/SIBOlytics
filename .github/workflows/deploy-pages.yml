@@ -1,8 +1,6 @@
-name: Deploy Vite App to GitHub Pages
+name: Deploy Vite App to GitHub Pages (Manual Only)
 
 on:
-  push:
-    branches: ['main']
   workflow_dispatch:
 
 permissions:
