@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import {existsSync} from 'node:fs';
 import path from 'node:path';
 import express, {NextFunction, Request, Response} from 'express';
-import {Pool} from 'pg';
+import {Pool, PoolClient} from 'pg';
 
 type SafeUser = {
   id: string;
@@ -111,26 +111,6 @@ CREATE TABLE IF NOT EXISTS food_log_entries (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS breath_tests (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  test_date DATE,
-  substrate TEXT NOT NULL CHECK (substrate IN ('glucose', 'lactulose', 'unknown')),
-  units TEXT NOT NULL CHECK (units IN ('ppm')),
-  notes TEXT NOT NULL DEFAULT '',
-  file_name TEXT NOT NULL DEFAULT '',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS breath_test_points (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  test_id UUID NOT NULL REFERENCES breath_tests(id) ON DELETE CASCADE,
-  minute INTEGER NOT NULL,
-  h2 NUMERIC NOT NULL,
-  ch4 NUMERIC NOT NULL,
-  h2s NUMERIC,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
 
 CREATE INDEX IF NOT EXISTS idx_symptom_entries_user_date
 ON symptom_entries (user_id, entry_date DESC);
@@ -138,12 +118,224 @@ ON symptom_entries (user_id, entry_date DESC);
 CREATE INDEX IF NOT EXISTS idx_food_log_entries_user_created
 ON food_log_entries (user_id, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_breath_tests_user_created
-ON breath_tests (user_id, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_breath_test_points_test_minute
-ON breath_test_points (test_id, minute ASC);
 `;
+
+async function tableExists(client: PoolClient, tableName: string): Promise<boolean> {
+  const result = await client.query(
+    `
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = $1
+    ) AS exists
+    `,
+    [tableName]
+  );
+  return Boolean(result.rows[0]?.exists);
+}
+
+async function columnExists(client: PoolClient, tableName: string, columnName: string): Promise<boolean> {
+  const result = await client.query(
+    `
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
+    ) AS exists
+    `,
+    [tableName, columnName]
+  );
+  return Boolean(result.rows[0]?.exists);
+}
+
+async function constraintExists(client: PoolClient, tableName: string, constraintName: string): Promise<boolean> {
+  const result = await client.query(
+    `
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.table_constraints
+      WHERE table_schema = 'public' AND table_name = $1 AND constraint_name = $2
+    ) AS exists
+    `,
+    [tableName, constraintName]
+  );
+  return Boolean(result.rows[0]?.exists);
+}
+
+async function indexExists(client: PoolClient, indexName: string): Promise<boolean> {
+  const result = await client.query('SELECT to_regclass($1) AS regclass', [`public.${indexName}`]);
+  return Boolean(result.rows[0]?.regclass);
+}
+
+async function runBreathTestSchemaMigration() {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS breath_test_types (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        code TEXT NOT NULL UNIQUE CHECK (code IN ('glucose', 'lactulose', 'unknown')),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      INSERT INTO breath_test_types (code)
+      VALUES ('lactulose'), ('glucose'), ('unknown')
+      ON CONFLICT (code) DO NOTHING
+    `);
+
+    const hasLegacyBreathTests = await tableExists(client, 'breath_tests');
+    const hasBreathTestRuns = await tableExists(client, 'breath_test_runs');
+
+    if (hasLegacyBreathTests && !hasBreathTestRuns) {
+      await client.query('ALTER TABLE breath_tests RENAME TO breath_test_runs');
+    }
+
+    const hasRuns = await tableExists(client, 'breath_test_runs');
+    if (!hasRuns) {
+      await client.query(`
+        CREATE TABLE breath_test_runs (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          breath_test_type_id UUID NOT NULL REFERENCES breath_test_types(id) ON DELETE RESTRICT,
+          test_date DATE,
+          units TEXT NOT NULL CHECK (units IN ('ppm')),
+          notes TEXT NOT NULL DEFAULT '',
+          file_name TEXT NOT NULL DEFAULT '',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    if (!(await columnExists(client, 'breath_test_runs', 'breath_test_type_id'))) {
+      await client.query('ALTER TABLE breath_test_runs ADD COLUMN breath_test_type_id UUID');
+    }
+
+    if (!(await columnExists(client, 'breath_test_runs', 'test_date'))) {
+      await client.query('ALTER TABLE breath_test_runs ADD COLUMN test_date DATE');
+    }
+
+    if (!(await columnExists(client, 'breath_test_runs', 'units'))) {
+      await client.query(`ALTER TABLE breath_test_runs ADD COLUMN units TEXT NOT NULL DEFAULT 'ppm'`);
+    }
+
+    if (!(await columnExists(client, 'breath_test_runs', 'notes'))) {
+      await client.query(`ALTER TABLE breath_test_runs ADD COLUMN notes TEXT NOT NULL DEFAULT ''`);
+    }
+
+    if (!(await columnExists(client, 'breath_test_runs', 'file_name'))) {
+      await client.query(`ALTER TABLE breath_test_runs ADD COLUMN file_name TEXT NOT NULL DEFAULT ''`);
+    }
+
+    if (!(await columnExists(client, 'breath_test_runs', 'created_at'))) {
+      await client.query(`ALTER TABLE breath_test_runs ADD COLUMN created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    }
+
+    if (await columnExists(client, 'breath_test_runs', 'substrate')) {
+      await client.query(`
+        UPDATE breath_test_runs run
+        SET breath_test_type_id = type.id
+        FROM breath_test_types type
+        WHERE run.breath_test_type_id IS NULL
+          AND type.code = CASE
+            WHEN run.substrate IN ('glucose', 'lactulose', 'unknown') THEN run.substrate
+            ELSE 'unknown'
+          END
+      `);
+    }
+
+    await client.query(`
+      UPDATE breath_test_runs run
+      SET breath_test_type_id = type.id
+      FROM breath_test_types type
+      WHERE run.breath_test_type_id IS NULL
+        AND type.code = 'unknown'
+    `);
+
+    await client.query('ALTER TABLE breath_test_runs ALTER COLUMN breath_test_type_id SET NOT NULL');
+
+    if (!(await constraintExists(client, 'breath_test_runs', 'fk_breath_test_runs_type'))) {
+      await client.query(`
+        ALTER TABLE breath_test_runs
+        ADD CONSTRAINT fk_breath_test_runs_type
+        FOREIGN KEY (breath_test_type_id) REFERENCES breath_test_types(id) ON DELETE RESTRICT
+      `);
+    }
+
+    if (await columnExists(client, 'breath_test_runs', 'substrate')) {
+      await client.query('ALTER TABLE breath_test_runs DROP COLUMN substrate');
+    }
+
+    const hasPoints = await tableExists(client, 'breath_test_points');
+    if (!hasPoints) {
+      await client.query(`
+        CREATE TABLE breath_test_points (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          test_id UUID NOT NULL REFERENCES breath_test_runs(id) ON DELETE CASCADE,
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          minute INTEGER NOT NULL,
+          h2 NUMERIC NOT NULL,
+          ch4 NUMERIC NOT NULL,
+          h2s NUMERIC,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    if (!(await columnExists(client, 'breath_test_points', 'user_id'))) {
+      await client.query('ALTER TABLE breath_test_points ADD COLUMN user_id UUID');
+    }
+
+    await client.query(`
+      UPDATE breath_test_points point
+      SET user_id = run.user_id
+      FROM breath_test_runs run
+      WHERE point.user_id IS NULL
+        AND point.test_id = run.id
+    `);
+
+    await client.query('ALTER TABLE breath_test_points ALTER COLUMN user_id SET NOT NULL');
+
+    if (!(await constraintExists(client, 'breath_test_points', 'fk_breath_test_points_user'))) {
+      await client.query(`
+        ALTER TABLE breath_test_points
+        ADD CONSTRAINT fk_breath_test_points_user
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      `);
+    }
+
+    if (
+      (await indexExists(client, 'idx_breath_tests_user_created')) &&
+      !(await indexExists(client, 'idx_breath_test_runs_user_created'))
+    ) {
+      await client.query('ALTER INDEX idx_breath_tests_user_created RENAME TO idx_breath_test_runs_user_created');
+    }
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_breath_test_runs_user_created
+      ON breath_test_runs (user_id, created_at DESC)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_breath_test_points_test_minute
+      ON breath_test_points (test_id, minute ASC)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_breath_test_points_user_test
+      ON breath_test_points (user_id, test_id, minute ASC)
+    `);
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -785,10 +977,18 @@ app.get('/api/breath-tests', requireAuth, async (req: AuthenticatedRequest, res)
 
   const testsResult = await pool.query(
     `
-    SELECT id, test_date, substrate, units, notes, file_name, created_at
-    FROM breath_tests
-    WHERE user_id = $1
-    ORDER BY COALESCE(test_date, created_at::date) DESC, created_at DESC
+    SELECT
+      run.id,
+      run.test_date,
+      type.code AS substrate,
+      run.units,
+      run.notes,
+      run.file_name,
+      run.created_at
+    FROM breath_test_runs run
+    INNER JOIN breath_test_types type ON type.id = run.breath_test_type_id
+    WHERE run.user_id = $1
+    ORDER BY COALESCE(run.test_date, run.created_at::date) DESC, run.created_at DESC
     `,
     [user.id]
   );
@@ -803,10 +1003,10 @@ app.get('/api/breath-tests', requireAuth, async (req: AuthenticatedRequest, res)
     `
     SELECT test_id, minute, h2, ch4, h2s
     FROM breath_test_points
-    WHERE test_id = ANY($1::uuid[])
+    WHERE test_id = ANY($1::uuid[]) AND user_id = $2
     ORDER BY minute ASC, created_at ASC
     `,
-    [testIds]
+    [testIds, user.id]
   );
 
   const pointsMap = new Map<string, BreathPointInput[]>();
@@ -862,30 +1062,51 @@ app.post('/api/breath-tests', requireAuth, async (req: AuthenticatedRequest, res
   try {
     await client.query('BEGIN');
 
+    const typeResult = await client.query(
+      `
+      SELECT id
+      FROM breath_test_types
+      WHERE code = $1
+      LIMIT 1
+      `,
+      [substrate]
+    );
+
+    if (!typeResult.rowCount) {
+      await client.query('ROLLBACK');
+      res.status(500).json({success: false, error: 'Breath test types are not initialized.'});
+      return;
+    }
+
+    const breathTestTypeId = String(typeResult.rows[0].id);
     const testInsert = await client.query(
       `
-      INSERT INTO breath_tests (user_id, test_date, substrate, units, notes, file_name)
+      INSERT INTO breath_test_runs (user_id, test_date, breath_test_type_id, units, notes, file_name)
       VALUES ($1, $2::date, $3, $4, $5, $6)
-      RETURNING id, test_date, substrate, units, notes, file_name, created_at
+      RETURNING id, test_date, units, notes, file_name, created_at
       `,
-      [user.id, testDate, substrate, units, notes, fileName]
+      [user.id, testDate, breathTestTypeId, units, notes, fileName]
     );
 
     const testId = testInsert.rows[0].id;
     for (const point of data) {
       await client.query(
         `
-        INSERT INTO breath_test_points (test_id, minute, h2, ch4, h2s)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO breath_test_points (test_id, user_id, minute, h2, ch4, h2s)
+        VALUES ($1, $2, $3, $4, $5, $6)
         `,
-        [testId, point.minute, point.h2, point.ch4, point.h2s ?? null]
+        [testId, user.id, point.minute, point.h2, point.ch4, point.h2s ?? null]
       );
     }
 
     await client.query('COMMIT');
+    const createdTestRow = {
+      ...testInsert.rows[0],
+      substrate,
+    };
     res.status(201).json({
       success: true,
-      data: mapBreathTestRow(testInsert.rows[0], data),
+      data: mapBreathTestRow(createdTestRow, data),
     });
   } catch (error) {
     await client.query('ROLLBACK');
@@ -902,7 +1123,7 @@ app.delete('/api/breath-tests/:id', requireAuth, async (req: AuthenticatedReques
   const id = String(req.params.id ?? '');
   const result = await pool.query(
     `
-    DELETE FROM breath_tests
+    DELETE FROM breath_test_runs
     WHERE id = $1 AND user_id = $2
     RETURNING id
     `,
@@ -947,6 +1168,7 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 
 async function startServer() {
   await pool.query(initSql);
+  await runBreathTestSchemaMigration();
   app.listen(port, () => {
     console.log(`Server listening on http://127.0.0.1:${port}`);
   });
