@@ -5,7 +5,7 @@ import {defineConfig, loadEnv} from 'vite';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
-  const base = env.VITE_BASE_URL || (mode === 'production' ? '/SIBOlytics/' : '/');
+  const base = env.VITE_BASE_URL || '/';
   return {
     base,
     plugins: [react(), tailwindcss()],
@@ -31,3 +31,4 @@ export default defineConfig(({mode}) => {
     },
   };
 });
+
