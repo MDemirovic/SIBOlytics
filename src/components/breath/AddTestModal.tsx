@@ -7,7 +7,7 @@ import { useLanguage } from '../../context/LanguageContext';
 
 interface AddTestModalProps {
   onClose: () => void;
-  onSave: (test: Omit<BreathTest, 'id' | 'createdAt'>) => void;
+  onSave: (test: Omit<BreathTest, 'id' | 'createdAt'>) => Promise<void>;
 }
 
 export default function AddTestModal({ onClose, onSave }: AddTestModalProps) {

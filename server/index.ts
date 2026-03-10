@@ -1077,6 +1077,34 @@ app.post('/api/breath-tests', requireAuth, async (req: AuthenticatedRequest, res
 
   const effectiveTestDate = testDate ?? toDateKey(new Date())!;
   const pointsPayload = encodeBreathPoints(data);
+  const pointsPayloadJson = JSON.stringify(pointsPayload);
+
+  // Guard against accidental multi-click submits creating duplicate rows.
+  const duplicateResult = await pool.query(
+    `
+    SELECT id, test_date, substrate, units, notes, file_name, points_json, created_at
+    FROM breath_test_runs
+    WHERE user_id = $1
+      AND test_date = $2::date
+      AND substrate = $3
+      AND units = $4
+      AND notes = $5
+      AND file_name = $6
+      AND points_json = $7::jsonb
+      AND created_at >= NOW() - INTERVAL '2 minutes'
+    ORDER BY created_at DESC
+    LIMIT 1
+    `,
+    [user.id, effectiveTestDate, substrate, units, notes, fileName, pointsPayloadJson]
+  );
+
+  if (duplicateResult.rowCount && duplicateResult.rows[0]) {
+    res.status(200).json({
+      success: true,
+      data: mapBreathTestRow(duplicateResult.rows[0], decodeBreathPoints(duplicateResult.rows[0].points_json)),
+    });
+    return;
+  }
 
   const testInsert = await pool.query(
     `
@@ -1084,7 +1112,7 @@ app.post('/api/breath-tests', requireAuth, async (req: AuthenticatedRequest, res
       VALUES ($1, $2::date, $3, $4, $5, $6, $7::jsonb)
       RETURNING id, test_date, substrate, units, notes, file_name, points_json, created_at
     `,
-    [user.id, effectiveTestDate, substrate, units, notes, fileName, JSON.stringify(pointsPayload)]
+    [user.id, effectiveTestDate, substrate, units, notes, fileName, pointsPayloadJson]
   );
 
   res.status(201).json({

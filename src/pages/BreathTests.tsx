@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Activity, Plus, AlertCircle, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -85,13 +85,13 @@ export default function BreathTests() {
   const handleSaveTest = async (testData: Omit<BreathTest, 'id' | 'createdAt'>) => {
     try {
       const newTest = await createBreathTest(testData);
-      const updatedTests = [newTest, ...tests];
-      setTests(updatedTests);
+      setTests((prev) => [newTest, ...prev.filter((test) => test.id !== newTest.id)]);
       setSelectedTestId(newTest.id);
       setIsAdding(false);
       setError('');
     } catch {
       setError(copy.saveError);
+      throw new Error(copy.saveError);
     }
   };
 
