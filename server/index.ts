@@ -1,4 +1,4 @@
-import 'dotenv/config';
+﻿import 'dotenv/config';
 import crypto from 'node:crypto';
 import {existsSync} from 'node:fs';
 import path from 'node:path';
@@ -843,8 +843,39 @@ app.post('/api/nih/chat', requireAuth, async (req: AuthenticatedRequest, res) =>
       },
     });
   } catch (error) {
+    const upstreamError = error as any;
+    const upstreamMessage = String(upstreamError?.message ?? 'Unknown upstream error');
+    const upstreamStatusRaw = upstreamError?.status ?? upstreamError?.statusCode;
+    const upstreamStatus = Number(upstreamStatusRaw);
+
+    console.error('[NIH_CHAT_UPSTREAM_ERROR]', {
+      status: Number.isFinite(upstreamStatus) ? upstreamStatus : null,
+      code: upstreamError?.code,
+      message: upstreamMessage,
+    });
+
     if (isQuotaError(error)) {
       sendNihError(res, 429, 'UPSTREAM_QUOTA_EXCEEDED', 'LLM quota exceeded. Please try again later.');
+      return;
+    }
+
+    const normalizedMessage = upstreamMessage.toLowerCase();
+    if (
+      upstreamStatus === 401 ||
+      upstreamStatus === 403 ||
+      normalizedMessage.includes('api key') ||
+      normalizedMessage.includes('unauthorized') ||
+      normalizedMessage.includes('permission denied')
+    ) {
+      sendNihError(res, 502, 'UPSTREAM_ERROR', 'LLM authentication failed. Check GEMINI_API_KEY.');
+      return;
+    }
+
+    if (
+      normalizedMessage.includes('model') &&
+      (normalizedMessage.includes('invalid') || normalizedMessage.includes('not found'))
+    ) {
+      sendNihError(res, 502, 'UPSTREAM_ERROR', 'LLM model is invalid. Check NIH_LLM_MODEL.');
       return;
     }
 
