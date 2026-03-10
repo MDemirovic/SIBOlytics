@@ -4,6 +4,13 @@ import {existsSync} from 'node:fs';
 import path from 'node:path';
 import express, {NextFunction, Request, Response} from 'express';
 import {Pool, PoolClient} from 'pg';
+import {
+  extractValidCitationIds,
+  generateNihAnswer,
+  isQuotaError,
+  NihLanguage,
+  retrieveNihCitations,
+} from './nihRag';
 
 type SafeUser = {
   id: string;
@@ -46,6 +53,18 @@ const sessionCookieName = 'sibolytics_session';
 const sessionDurationDays = 7;
 const isProduction = process.env.NODE_ENV === 'production';
 const clientDistPath = path.resolve(process.cwd(), 'dist');
+const nihMaxContextChars = Number(process.env.NIH_MAX_CONTEXT_CHARS ?? 12000);
+const nihMaxQpsPerUser = Number(process.env.NIH_MAX_QPS_PER_USER ?? 1);
+const nihMaxReqPerHour = Number(process.env.NIH_MAX_REQ_PER_HOUR ?? 30);
+const nihRateWindowMs = 60 * 60 * 1000;
+
+type NihRateState = {
+  windowStartMs: number;
+  count: number;
+  lastRequestMs: number;
+};
+
+const nihRateMap = new Map<string, NihRateState>();
 
 if (!databaseUrl) {
   throw new Error('Missing DATABASE_URL in environment variables.');
@@ -410,6 +429,66 @@ function clearSessionCookie(res: Response) {
   });
 }
 
+
+type NihApiErrorCode =
+  | 'INVALID_INPUT'
+  | 'LOCAL_RATE_LIMIT'
+  | 'UPSTREAM_QUOTA_EXCEEDED'
+  | 'UPSTREAM_ERROR'
+  | 'NO_VALID_CITATIONS';
+
+function sendNihError(res: Response, status: number, code: NihApiErrorCode, message: string) {
+  res.status(status).json({success: false, error: message, code});
+}
+
+function getClientIp(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return forwarded.split(',')[0].trim();
+  }
+  if (Array.isArray(forwarded) && forwarded.length > 0) {
+    return String(forwarded[0]).trim();
+  }
+  return req.socket.remoteAddress ?? 'unknown';
+}
+
+function checkNihRateLimit(key: string, nowMs = Date.now()): boolean {
+  if (nihRateMap.size > 20000) {
+    const cutoff = nowMs - nihRateWindowMs;
+    for (const [entryKey, state] of nihRateMap.entries()) {
+      if (state.windowStartMs < cutoff) nihRateMap.delete(entryKey);
+    }
+  }
+
+  const intervalMs = nihMaxQpsPerUser > 0 ? Math.ceil(1000 / nihMaxQpsPerUser) : 0;
+  const previous = nihRateMap.get(key);
+
+  if (!previous) {
+    nihRateMap.set(key, {windowStartMs: nowMs, count: 1, lastRequestMs: nowMs});
+    return true;
+  }
+
+  const state: NihRateState = {...previous};
+  if (nowMs - state.windowStartMs >= nihRateWindowMs) {
+    state.windowStartMs = nowMs;
+    state.count = 0;
+  }
+
+  if (intervalMs > 0 && nowMs - state.lastRequestMs < intervalMs) {
+    nihRateMap.set(key, state);
+    return false;
+  }
+
+  if (state.count >= nihMaxReqPerHour) {
+    nihRateMap.set(key, state);
+    return false;
+  }
+
+  state.count += 1;
+  state.lastRequestMs = nowMs;
+  nihRateMap.set(key, state);
+  return true;
+}
 function validateEmail(email: string): boolean {
   return /\S+@\S+\.\S+/.test(email);
 }
@@ -681,6 +760,96 @@ async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextF
 
 app.get('/api/health', (_req, res) => {
   res.json({ok: true});
+});
+
+app.post('/api/nih/chat', requireAuth, async (req: AuthenticatedRequest, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+
+  const question = typeof req.body?.question === 'string' ? req.body.question.trim() : '';
+  const language = req.body?.language === 'hr' ? 'hr' : 'en';
+
+  if (!question || question.length < 3 || question.length > 1000) {
+    sendNihError(res, 400, 'INVALID_INPUT', 'Question must be between 3 and 1000 characters.');
+    return;
+  }
+
+  const rateKey = `${user.id}:${getClientIp(req)}`;
+  if (!checkNihRateLimit(rateKey)) {
+    sendNihError(res, 429, 'LOCAL_RATE_LIMIT', 'Rate limit exceeded. Please try again shortly.');
+    return;
+  }
+
+  const retrieved = retrieveNihCitations(question);
+  if (retrieved.length === 0) {
+    sendNihError(res, 422, 'NO_VALID_CITATIONS', 'Not enough NIH evidence found for this question.');
+    return;
+  }
+
+  const boundedCitations = (() => {
+    const maxChars = Number.isFinite(nihMaxContextChars) && nihMaxContextChars > 500
+      ? Math.floor(nihMaxContextChars)
+      : 12000;
+
+    const items = [] as typeof retrieved;
+    let consumed = 0;
+
+    for (const citation of retrieved) {
+      if (consumed >= maxChars) break;
+      const remaining = maxChars - consumed;
+      if (remaining < 200) break;
+
+      const clipped = citation.content.length > remaining
+        ? citation.content.slice(0, remaining)
+        : citation.content;
+
+      consumed += clipped.length;
+      items.push({...citation, content: clipped});
+    }
+
+    return items;
+  })();
+
+  if (boundedCitations.length === 0) {
+    sendNihError(res, 422, 'NO_VALID_CITATIONS', 'Not enough NIH evidence found for this question.');
+    return;
+  }
+
+  try {
+    const result = await generateNihAnswer(question, language as NihLanguage, boundedCitations);
+    const allowedIds = new Set(boundedCitations.map((item) => item.id));
+    const citationIds = extractValidCitationIds(result.answer, allowedIds);
+
+    if (citationIds.length === 0) {
+      sendNihError(res, 422, 'NO_VALID_CITATIONS', 'Model answer did not include valid citations.');
+      return;
+    }
+
+    const citations = boundedCitations
+      .filter((item) => citationIds.includes(item.id))
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        url: item.url,
+        snippet: item.snippet,
+      }));
+
+    res.json({
+      success: true,
+      data: {
+        answer: result.answer,
+        citations,
+        model: result.model,
+      },
+    });
+  } catch (error) {
+    if (isQuotaError(error)) {
+      sendNihError(res, 429, 'UPSTREAM_QUOTA_EXCEEDED', 'LLM quota exceeded. Please try again later.');
+      return;
+    }
+
+    sendNihError(res, 502, 'UPSTREAM_ERROR', 'LLM provider unavailable. Please try again later.');
+  }
 });
 
 app.post('/api/auth/signup', async (req, res) => {
@@ -1183,3 +1352,8 @@ startServer().catch((error) => {
   console.error('Failed to start API server:', error);
   process.exit(1);
 });
+
+
+
+
+
