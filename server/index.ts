@@ -167,7 +167,7 @@ async function indexExists(client: PoolClient, indexName: string): Promise<boole
   return Boolean(result.rows[0]?.regclass);
 }
 
-async function runBreathTestPointsJsonMigration() {
+async function runBreathTestSingleTableMigration() {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -189,6 +189,7 @@ async function runBreathTestPointsJsonMigration() {
           units TEXT NOT NULL CHECK (units IN ('ppm')),
           notes TEXT NOT NULL DEFAULT '',
           file_name TEXT NOT NULL DEFAULT '',
+          points_json JSONB NOT NULL DEFAULT '{}'::jsonb,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `);
@@ -216,6 +217,10 @@ async function runBreathTestPointsJsonMigration() {
 
     if (!(await columnExists(client, 'breath_test_runs', 'file_name'))) {
       await client.query(`ALTER TABLE breath_test_runs ADD COLUMN file_name TEXT NOT NULL DEFAULT ''`);
+    }
+
+    if (!(await columnExists(client, 'breath_test_runs', 'points_json'))) {
+      await client.query('ALTER TABLE breath_test_runs ADD COLUMN points_json JSONB');
     }
 
     if (!(await columnExists(client, 'breath_test_runs', 'created_at'))) {
@@ -251,6 +256,62 @@ async function runBreathTestPointsJsonMigration() {
       `);
     }
 
+    if (await tableExists(client, 'breath_test_points')) {
+      const hasPointsJson = await columnExists(client, 'breath_test_points', 'points_json');
+      const hasMinute = await columnExists(client, 'breath_test_points', 'minute');
+      const hasH2 = await columnExists(client, 'breath_test_points', 'h2');
+      const hasCh4 = await columnExists(client, 'breath_test_points', 'ch4');
+      const hasH2s = await columnExists(client, 'breath_test_points', 'h2s');
+
+      if (hasPointsJson) {
+        await client.query(`
+          UPDATE breath_test_runs run
+          SET points_json = COALESCE(src.points_json, '{}'::jsonb)
+          FROM (
+            SELECT DISTINCT ON (test_id)
+              test_id,
+              COALESCE(points_json, '{}'::jsonb) AS points_json
+            FROM breath_test_points
+            ORDER BY test_id, created_at DESC
+          ) src
+          WHERE run.id = src.test_id
+            AND (run.points_json IS NULL OR run.points_json = '{}'::jsonb)
+        `);
+      } else if (hasMinute && hasH2 && hasCh4) {
+        const h2sExpr = hasH2s ? 'p.h2s' : 'NULL';
+        await client.query(`
+          UPDATE breath_test_runs run
+          SET points_json = COALESCE(src.points_json, '{}'::jsonb)
+          FROM (
+            SELECT
+              p.test_id,
+              COALESCE(
+                jsonb_object_agg(
+                  p.minute::text,
+                  jsonb_strip_nulls(jsonb_build_object('h2', p.h2, 'ch4', p.ch4, 'h2s', ${h2sExpr}))
+                  ORDER BY p.minute
+                ),
+                '{}'::jsonb
+              ) AS points_json
+            FROM breath_test_points p
+            GROUP BY p.test_id
+          ) src
+          WHERE run.id = src.test_id
+            AND (run.points_json IS NULL OR run.points_json = '{}'::jsonb)
+        `);
+      }
+
+      await client.query('DROP TABLE breath_test_points');
+    }
+
+    await client.query(`
+      UPDATE breath_test_runs
+      SET points_json = '{}'::jsonb
+      WHERE points_json IS NULL
+    `);
+    await client.query(`ALTER TABLE breath_test_runs ALTER COLUMN points_json SET DEFAULT '{}'::jsonb`);
+    await client.query('ALTER TABLE breath_test_runs ALTER COLUMN points_json SET NOT NULL');
+
     if (await columnExists(client, 'breath_test_runs', 'breath_test_type_id')) {
       await client.query('ALTER TABLE breath_test_runs DROP COLUMN breath_test_type_id');
     }
@@ -259,126 +320,14 @@ async function runBreathTestPointsJsonMigration() {
       await client.query('DROP TABLE breath_test_types');
     }
 
-    const hasPoints = await tableExists(client, 'breath_test_points');
-    if (!hasPoints) {
-      await client.query(`
-        CREATE TABLE breath_test_points (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          test_id UUID NOT NULL UNIQUE REFERENCES breath_test_runs(id) ON DELETE CASCADE,
-          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          test_date DATE NOT NULL,
-          points_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-      `);
-    } else {
-      const hasPointsJson = await columnExists(client, 'breath_test_points', 'points_json');
-      const hasMinute = await columnExists(client, 'breath_test_points', 'minute');
-      const hasH2 = await columnExists(client, 'breath_test_points', 'h2');
-      const hasCh4 = await columnExists(client, 'breath_test_points', 'ch4');
-      const hasH2s = await columnExists(client, 'breath_test_points', 'h2s');
-
-      if (!hasPointsJson && hasMinute && hasH2 && hasCh4) {
-        const h2sExpr = hasH2s ? 'p.h2s' : 'NULL';
-
-        await client.query(`
-          CREATE TABLE breath_test_points_new (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            test_id UUID NOT NULL UNIQUE REFERENCES breath_test_runs(id) ON DELETE CASCADE,
-            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            test_date DATE NOT NULL,
-            points_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-          )
-        `);
-
-        await client.query(`
-          INSERT INTO breath_test_points_new (test_id, user_id, test_date, points_json, created_at)
-          SELECT
-            run.id AS test_id,
-            run.user_id,
-            COALESCE(run.test_date, MIN(p.created_at)::date, NOW()::date) AS test_date,
-            COALESCE(
-              jsonb_object_agg(
-                p.minute::text,
-                jsonb_strip_nulls(jsonb_build_object('h2', p.h2, 'ch4', p.ch4, 'h2s', ${h2sExpr}))
-                ORDER BY p.minute
-              ),
-              '{}'::jsonb
-            ) AS points_json,
-            COALESCE(MIN(p.created_at), run.created_at, NOW()) AS created_at
-          FROM breath_test_runs run
-          LEFT JOIN breath_test_points p ON p.test_id = run.id
-          GROUP BY run.id, run.user_id, run.test_date, run.created_at
-        `);
-
-        await client.query('DROP TABLE breath_test_points');
-        await client.query('ALTER TABLE breath_test_points_new RENAME TO breath_test_points');
-      }
-    }
-
-    if (!(await columnExists(client, 'breath_test_points', 'user_id'))) {
-      await client.query('ALTER TABLE breath_test_points ADD COLUMN user_id UUID');
-    }
-
-    if (!(await columnExists(client, 'breath_test_points', 'test_date'))) {
-      await client.query('ALTER TABLE breath_test_points ADD COLUMN test_date DATE');
-    }
-
-    if (!(await columnExists(client, 'breath_test_points', 'points_json'))) {
-      await client.query('ALTER TABLE breath_test_points ADD COLUMN points_json JSONB');
-    }
-
-    await client.query(`
-      UPDATE breath_test_points point
-      SET user_id = run.user_id
-      FROM breath_test_runs run
-      WHERE point.user_id IS NULL
-        AND point.test_id = run.id
-    `);
-
-    await client.query(`
-      UPDATE breath_test_points point
-      SET test_date = COALESCE(point.test_date, run.test_date, point.created_at::date, NOW()::date)
-      FROM breath_test_runs run
-      WHERE point.test_date IS NULL
-        AND point.test_id = run.id
-    `);
-
-    await client.query(`
-      UPDATE breath_test_points
-      SET points_json = '{}'::jsonb
-      WHERE points_json IS NULL
-    `);
-
-    await client.query('ALTER TABLE breath_test_points ALTER COLUMN user_id SET NOT NULL');
-    await client.query('ALTER TABLE breath_test_points ALTER COLUMN test_date SET NOT NULL');
-    await client.query('ALTER TABLE breath_test_points ALTER COLUMN points_json SET NOT NULL');
-
-    if (!(await constraintExists(client, 'breath_test_points', 'fk_breath_test_points_user'))) {
-      await client.query(`
-        ALTER TABLE breath_test_points
-        ADD CONSTRAINT fk_breath_test_points_user
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-      `);
-    }
-
     await client.query('DROP INDEX IF EXISTS idx_breath_test_points_test_minute');
     await client.query('DROP INDEX IF EXISTS idx_breath_test_points_user_test');
+    await client.query('DROP INDEX IF EXISTS uq_breath_test_points_test_id');
+    await client.query('DROP INDEX IF EXISTS idx_breath_test_points_user_test_date');
 
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_breath_test_runs_user_created
       ON breath_test_runs (user_id, created_at DESC)
-    `);
-
-    await client.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS uq_breath_test_points_test_id
-      ON breath_test_points (test_id)
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_breath_test_points_user_test_date
-      ON breath_test_points (user_id, test_date DESC)
     `);
 
     await client.query('COMMIT');
@@ -1082,7 +1031,7 @@ app.get('/api/breath-tests', requireAuth, async (req: AuthenticatedRequest, res)
 
   const testsResult = await pool.query(
     `
-    SELECT id, test_date, substrate, units, notes, file_name, created_at
+    SELECT id, test_date, substrate, units, notes, file_name, points_json, created_at
     FROM breath_test_runs
     WHERE user_id = $1
     ORDER BY COALESCE(test_date, created_at::date) DESC, created_at DESC
@@ -1090,29 +1039,8 @@ app.get('/api/breath-tests', requireAuth, async (req: AuthenticatedRequest, res)
     [user.id]
   );
 
-  if (!testsResult.rowCount) {
-    res.json({success: true, data: []});
-    return;
-  }
-
-  const testIds = testsResult.rows.map((row) => row.id);
-  const pointsResult = await pool.query(
-    `
-    SELECT test_id, points_json
-    FROM breath_test_points
-    WHERE test_id = ANY($1::uuid[]) AND user_id = $2
-    `,
-    [testIds, user.id]
-  );
-
-  const pointsMap = new Map<string, BreathPointInput[]>();
-  for (const row of pointsResult.rows) {
-    const key = String(row.test_id);
-    pointsMap.set(key, decodeBreathPoints(row.points_json));
-  }
-
   const tests = testsResult.rows.map((row) =>
-    mapBreathTestRow(row, pointsMap.get(String(row.id)) ?? [])
+    mapBreathTestRow(row, decodeBreathPoints(row.points_json))
   );
   res.json({success: true, data: tests});
 });
@@ -1150,39 +1078,19 @@ app.post('/api/breath-tests', requireAuth, async (req: AuthenticatedRequest, res
   const effectiveTestDate = testDate ?? toDateKey(new Date())!;
   const pointsPayload = encodeBreathPoints(data);
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
+  const testInsert = await pool.query(
+    `
+      INSERT INTO breath_test_runs (user_id, test_date, substrate, units, notes, file_name, points_json)
+      VALUES ($1, $2::date, $3, $4, $5, $6, $7::jsonb)
+      RETURNING id, test_date, substrate, units, notes, file_name, points_json, created_at
+    `,
+    [user.id, effectiveTestDate, substrate, units, notes, fileName, JSON.stringify(pointsPayload)]
+  );
 
-    const testInsert = await client.query(
-      `
-      INSERT INTO breath_test_runs (user_id, test_date, substrate, units, notes, file_name)
-      VALUES ($1, $2::date, $3, $4, $5, $6)
-      RETURNING id, test_date, substrate, units, notes, file_name, created_at
-      `,
-      [user.id, effectiveTestDate, substrate, units, notes, fileName]
-    );
-
-    const testId = testInsert.rows[0].id;
-    await client.query(
-      `
-      INSERT INTO breath_test_points (test_id, user_id, test_date, points_json)
-      VALUES ($1, $2, $3::date, $4::jsonb)
-      `,
-      [testId, user.id, effectiveTestDate, JSON.stringify(pointsPayload)]
-    );
-
-    await client.query('COMMIT');
-    res.status(201).json({
-      success: true,
-      data: mapBreathTestRow(testInsert.rows[0], data),
-    });
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
+  res.status(201).json({
+    success: true,
+    data: mapBreathTestRow(testInsert.rows[0], data),
+  });
 });
 
 app.delete('/api/breath-tests/:id', requireAuth, async (req: AuthenticatedRequest, res) => {
@@ -1237,7 +1145,7 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 
 async function startServer() {
   await pool.query(initSql);
-  await runBreathTestPointsJsonMigration();
+  await runBreathTestSingleTableMigration();
   app.listen(port, () => {
     console.log(`Server listening on http://127.0.0.1:${port}`);
   });
@@ -1247,5 +1155,3 @@ startServer().catch((error) => {
   console.error('Failed to start API server:', error);
   process.exit(1);
 });
-
-
