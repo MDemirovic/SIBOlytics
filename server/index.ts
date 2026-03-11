@@ -867,7 +867,7 @@ app.post('/api/nih/chat', requireAuth, async (req: AuthenticatedRequest, res) =>
       normalizedMessage.includes('unauthorized') ||
       normalizedMessage.includes('permission denied')
     ) {
-      sendNihError(res, 502, 'UPSTREAM_ERROR', 'LLM authentication failed. Check GEMINI_API_KEY.');
+      sendNihError(res, 502, 'UPSTREAM_ERROR', 'LLM authentication failed. Check provider API key (GEMINI_API_KEY or GROQ_API_KEY).');
       return;
     }
 
@@ -875,7 +875,7 @@ app.post('/api/nih/chat', requireAuth, async (req: AuthenticatedRequest, res) =>
       normalizedMessage.includes('model') &&
       (normalizedMessage.includes('invalid') || normalizedMessage.includes('not found'))
     ) {
-      sendNihError(res, 502, 'UPSTREAM_ERROR', 'LLM model is invalid. Check NIH_LLM_MODEL.');
+      sendNihError(res, 502, 'UPSTREAM_ERROR', 'LLM model is invalid. Check NIH_LLM_MODEL (Gemini) or NIH_GROQ_MODEL (Groq).');
       return;
     }
 
@@ -1383,6 +1383,7 @@ startServer().catch((error) => {
   console.error('Failed to start API server:', error);
   process.exit(1);
 });
+
 
 
 

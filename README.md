@@ -1,4 +1,4 @@
-# SIBOlytics
+﻿# SIBOlytics
 
 SIBOlytics is a full-stack app (React + Express + Postgres) for SIBO tracking.
 
@@ -6,7 +6,7 @@ SIBOlytics is a full-stack app (React + Express + Postgres) for SIBO tracking.
 - Frontend: React, TypeScript, Vite, Tailwind
 - Backend: Express, TypeScript
 - Database: Postgres (Neon for free launch)
-- NIH RAG LLM: Gemini API (free-tier supported)
+- NIH RAG LLM: Gemini or Groq API (free-tier options)
 
 ## Local Setup
 
@@ -19,10 +19,13 @@ npm ci
 Copy `.env.example` to `.env` and set:
 - `DATABASE_URL`
 - `API_PORT` (optional, default backend port is `3001`)
-- `GEMINI_API_KEY` (required if you want `/api/nih/chat` to work)
+- `NIH_LLM_PROVIDER` (`gemini` or `groq`)
+
+Provider keys/models:
+- Gemini: `GEMINI_API_KEY`, optional `NIH_LLM_MODEL` (default `gemini-2.0-flash`)
+- Groq: `GROQ_API_KEY`, optional `NIH_GROQ_MODEL` (default `llama-3.1-8b-instant`)
 
 Optional NIH settings:
-- `NIH_LLM_MODEL` (default `gemini-2.0-flash`)
 - `NIH_TOP_K` (default `6`)
 - `NIH_MAX_CONTEXT_CHARS` (default `12000`)
 - `NIH_MAX_QPS_PER_USER` (default `1`)
@@ -50,10 +53,13 @@ Open `http://localhost:3000`.
 - `DATABASE_URL=<your_neon_connection_string>`
 - `NODE_ENV=production`
 - `VITE_BASE_URL=/`
-- `GEMINI_API_KEY=<your_google_ai_studio_key>`
+- `NIH_LLM_PROVIDER=gemini` or `NIH_LLM_PROVIDER=groq`
+- if Gemini: `GEMINI_API_KEY=<your_google_ai_studio_key>`
+- if Groq: `GROQ_API_KEY=<your_groq_api_key>`
 
 ### Recommended NIH env on Render
-- `NIH_LLM_MODEL=gemini-2.0-flash`
+- Gemini model: `NIH_LLM_MODEL=gemini-2.0-flash`
+- Groq model (if provider=groq): `NIH_GROQ_MODEL=llama-3.1-8b-instant`
 - `NIH_TOP_K=6`
 - `NIH_MAX_CONTEXT_CHARS=12000`
 - `NIH_MAX_QPS_PER_USER=1`

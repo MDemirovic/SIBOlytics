@@ -1,4 +1,4 @@
-import {existsSync, readdirSync, readFileSync} from 'node:fs';
+﻿import {existsSync, readdirSync, readFileSync} from 'node:fs';
 import path from 'node:path';
 import {GoogleGenAI} from '@google/genai';
 import lunr from 'lunr';
@@ -27,6 +27,8 @@ export type NihCitation = {
   content: string;
 };
 
+type NihLlmProvider = 'gemini' | 'groq';
+
 const defaultTopK = Number(process.env.NIH_TOP_K ?? 6);
 const cacheDir = path.resolve(process.cwd(), 'src', 'nih_kb', 'cache');
 
@@ -35,7 +37,12 @@ let index: lunr.Index | null = null;
 
 const geminiApiKey = (process.env.GEMINI_API_KEY ?? '').trim();
 const geminiModel = (process.env.NIH_LLM_MODEL ?? 'gemini-2.0-flash').trim();
-const ai = geminiApiKey ? new GoogleGenAI({apiKey: geminiApiKey}) : null;
+const groqApiKey = (process.env.GROQ_API_KEY ?? '').trim();
+const groqModel = (process.env.NIH_GROQ_MODEL ?? 'llama-3.1-8b-instant').trim();
+const providerRaw = (process.env.NIH_LLM_PROVIDER ?? '').trim().toLowerCase();
+const llmProvider: NihLlmProvider = providerRaw === 'groq' ? 'groq' : 'gemini';
+
+const geminiClient = geminiApiKey ? new GoogleGenAI({apiKey: geminiApiKey}) : null;
 
 function normalizeText(value: string): string {
   return value
@@ -200,18 +207,14 @@ function buildPrompt(question: string, citations: NihCitation[], language: NihLa
   ].join('\n');
 }
 
-export async function generateNihAnswer(
-  question: string,
-  language: NihLanguage,
-  citations: NihCitation[]
-): Promise<{answer: string; model: string}> {
-  if (!ai) {
+async function generateWithGemini(prompt: string): Promise<{answer: string; model: string}> {
+  if (!geminiClient) {
     throw Object.assign(new Error('Gemini API key is not configured.'), {status: 500, code: 'UPSTREAM_ERROR'});
   }
 
-  const response = await ai.models.generateContent({
+  const response = await geminiClient.models.generateContent({
     model: geminiModel,
-    contents: buildPrompt(question, citations, language),
+    contents: prompt,
     config: {
       temperature: 0.2,
       maxOutputTokens: 350,
@@ -227,6 +230,65 @@ export async function generateNihAnswer(
     answer,
     model: response.modelVersion ?? geminiModel,
   };
+}
+
+async function generateWithGroq(prompt: string): Promise<{answer: string; model: string}> {
+  if (!groqApiKey) {
+    throw Object.assign(new Error('Groq API key is not configured.'), {status: 500, code: 'UPSTREAM_ERROR'});
+  }
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${groqApiKey}`,
+    },
+    body: JSON.stringify({
+      model: groqModel,
+      messages: [{role: 'user', content: prompt}],
+      temperature: 0.2,
+      max_tokens: 350,
+    }),
+  });
+
+  let payload: any = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    const message = String(
+      payload?.error?.message ??
+      payload?.message ??
+      `Groq request failed with status ${response.status}.`
+    );
+    throw Object.assign(new Error(message), {
+      status: response.status,
+      code: payload?.error?.code ?? 'UPSTREAM_ERROR',
+    });
+  }
+
+  const answer = String(payload?.choices?.[0]?.message?.content ?? '').trim();
+  if (!answer) {
+    throw Object.assign(new Error('Model returned empty content.'), {status: 502, code: 'UPSTREAM_ERROR'});
+  }
+
+  return {
+    answer,
+    model: String(payload?.model ?? groqModel),
+  };
+}
+
+export async function generateNihAnswer(
+  question: string,
+  language: NihLanguage,
+  citations: NihCitation[]
+): Promise<{answer: string; model: string}> {
+  const prompt = buildPrompt(question, citations, language);
+  if (llmProvider === 'groq') return generateWithGroq(prompt);
+  return generateWithGemini(prompt);
 }
 
 export function extractValidCitationIds(answer: string, allowedIds: Set<string>): string[] {
@@ -248,6 +310,7 @@ export function isQuotaError(error: unknown): boolean {
     message.includes('quota') ||
     message.includes('resource exhausted') ||
     message.includes('rate limit') ||
-    message.includes('too many requests')
+    message.includes('too many requests') ||
+    message.includes('credit balance is too low')
   );
 }
