@@ -705,6 +705,66 @@ function parsePipeTableRows(text: string, byMinute: Map<number, BreathOcrRow>, w
   }
 }
 
+function parseClockToMinutes(clockValue: string): number | null {
+  const match = clockValue.match(/\b(\d{1,2}):(\d{2})\b/);
+  if (!match?.[1] || !match?.[2]) return null;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+
+  return (hours * 60) + minutes;
+}
+
+function parseTimedRows(text: string, byMinute: Map<number, BreathOcrRow>, warnings: string[]) {
+  const lines = text
+    .replace(/[\u2013\u2014]/g, '-')
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+
+  let baselineClockMinutes: number | null = null;
+
+  for (const line of lines) {
+    if (!/\d/.test(line)) continue;
+    if (line.length > 140) continue;
+
+    const timeMatch = line.match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/);
+    if (!timeMatch?.[0]) continue;
+
+    const clockMinutes = parseClockToMinutes(timeMatch[0]);
+    if (clockMinutes === null) continue;
+
+    const sampleBeforeTime = line
+      .slice(0, line.indexOf(timeMatch[0]))
+      .match(/(?:^|\s)(\d{1,2})\.?(?:\s|$)/);
+
+    if (!sampleBeforeTime?.[1]) continue;
+
+    const lineAfterTime = line.slice(line.indexOf(timeMatch[0]) + timeMatch[0].length).trim();
+    const numericTail = (lineAfterTime.match(/-?\d+(?:[.,]\d+)?/g) ?? [])
+      .map((token) => parseOcrNumber(token))
+      .filter((value): value is number => value !== null);
+
+    if (numericTail.length < 2) continue;
+
+    if (baselineClockMinutes === null) {
+      baselineClockMinutes = clockMinutes;
+    }
+
+    let minute = clockMinutes - baselineClockMinutes;
+    if (minute < 0) minute += 24 * 60;
+    if (minute < 0 || minute > 360) continue;
+
+    const h2 = normalizeGasValue(numericTail[0] ?? null);
+    const ch4 = normalizeGasValue(numericTail[1] ?? null);
+    if (h2 === null && ch4 === null) continue;
+
+    upsertBreathOcrRow(byMinute, {minute, h2, ch4}, warnings);
+  }
+}
+
 function parseLooseRows(text: string, byMinute: Map<number, BreathOcrRow>, warnings: string[]) {
   const lines = text
     .replace(/[\u2013\u2014]/g, '-')
@@ -714,6 +774,7 @@ function parseLooseRows(text: string, byMinute: Map<number, BreathOcrRow>, warni
 
   for (const rawLine of lines) {
     if (!/\d/.test(rawLine)) continue;
+    if (rawLine.length > 140) continue;
 
     const lineWithoutTime = rawLine
       .replace(/\b\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?\b/gi, ' ')
@@ -737,6 +798,7 @@ function parseLooseRows(text: string, byMinute: Map<number, BreathOcrRow>, warni
       if (numericTokens.length < 3) continue;
       const candidateMinute = numericTokens[0];
       if (!Number.isInteger(candidateMinute) || candidateMinute < 0 || candidateMinute > 360) continue;
+      if (candidateMinute > 0 && candidateMinute < 10) continue;
       minute = candidateMinute;
       numericTokens.shift();
     }
@@ -774,7 +836,11 @@ function parseBreathOcrRows(markdown: string): {rows: BreathOcrRow[]; warnings: 
   const byMinute = new Map<number, BreathOcrRow>();
 
   parsePipeTableRows(markdown, byMinute, warnings);
-  parseLooseRows(markdown, byMinute, warnings);
+  parseTimedRows(markdown, byMinute, warnings);
+
+  if (byMinute.size < 2) {
+    parseLooseRows(markdown, byMinute, warnings);
+  }
 
   const rows = [...byMinute.values()].sort((a, b) => a.minute - b.minute);
 
