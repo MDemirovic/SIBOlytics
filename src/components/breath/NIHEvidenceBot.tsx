@@ -10,6 +10,44 @@ interface Message {
   citations?: NihChatCitation[];
 }
 
+function normalizeBotMarkdown(text: string): string {
+  return text
+    .replace(/(^|\n)(\d+)\.\*\*/g, '$1$2. **')
+    .trim();
+}
+
+function renderInlineBold(text: string): React.ReactNode[] {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, index) => {
+    const boldMatch = part.match(/^\*\*([^*]+)\*\*$/);
+    if (!boldMatch) {
+      return <React.Fragment key={index}>{part}</React.Fragment>;
+    }
+
+    return (
+      <strong key={index} className="font-semibold text-slate-100">
+        {boldMatch[1]}
+      </strong>
+    );
+  });
+}
+
+function renderBotContent(content: string): React.ReactNode {
+  const normalized = normalizeBotMarkdown(content);
+  const lines = normalized.split('\n');
+
+  return (
+    <>
+      {lines.map((line, index) => (
+        <React.Fragment key={index}>
+          {renderInlineBold(line)}
+          {index < lines.length - 1 ? <br /> : null}
+        </React.Fragment>
+      ))}
+    </>
+  );
+}
+
 export default function NIHEvidenceBot() {
   const { isHr, language } = useLanguage();
   const introText = useMemo(() => (
@@ -131,7 +169,9 @@ export default function NIHEvidenceBot() {
                   : 'bg-slate-800 text-slate-200 rounded-bl-sm border border-slate-700'
               }`}
             >
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                {msg.role === 'bot' ? renderBotContent(msg.content) : msg.content}
+              </p>
             </div>
 
             {msg.role === 'bot' && msg.citations && msg.citations.length > 0 && (
