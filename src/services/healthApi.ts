@@ -20,6 +20,19 @@ export type FoodLogInput = {
   notes?: string;
 };
 
+export type NihChatCitation = {
+  id: string;
+  title: string;
+  url: string;
+  snippet: string;
+};
+
+export type NihChatResponse = {
+  answer: string;
+  citations: NihChatCitation[];
+  model: string;
+};
+
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim().replace(/\/$/, '') || '';
 
 function apiUrl(path: string) {
@@ -123,6 +136,18 @@ function normalizeSymptomEntries(raw: unknown): SymptomDiaryEntry[] {
   });
 }
 
+export class ApiRequestError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(apiUrl(path), {
     ...init,
@@ -146,7 +171,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   if (!response.ok || payload?.success === false) {
     const message = payload?.error || `Request failed (${response.status}).`;
-    throw new Error(message);
+    const code = typeof payload?.code === 'string' ? payload.code : undefined;
+    throw new ApiRequestError(message, response.status, code);
   }
 
   if (payload && Object.prototype.hasOwnProperty.call(payload, 'data')) {
@@ -219,3 +245,9 @@ export function deleteBreathTest(id: string) {
   });
 }
 
+export function askNihBot(question: string, language: 'en' | 'hr') {
+  return request<NihChatResponse>('/api/nih/chat', {
+    method: 'POST',
+    body: JSON.stringify({ question, language }),
+  });
+}
