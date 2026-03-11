@@ -49,6 +49,12 @@ const llmProvider: NihLlmProvider = providerRaw === 'groq' ? 'groq' : 'gemini';
 const geminiClient = geminiApiKey ? new GoogleGenAI({apiKey: geminiApiKey}) : null;
 const runtimeChunkWords = Number(process.env.NIH_RUNTIME_CHUNK_WORDS ?? 240);
 const runtimeChunkOverlapWords = Number(process.env.NIH_RUNTIME_CHUNK_OVERLAP_WORDS ?? 60);
+const typoMaxEditDistance = Number(process.env.NIH_TYPO_MAX_EDIT_DISTANCE ?? 2);
+const lexiconMaxTerms = Number(process.env.NIH_LEXICON_MAX_TERMS ?? 15000);
+
+let lexiconTerms: string[] = [];
+let lexiconSet = new Set<string>();
+let lexiconFrequency = new Map<string, number>();
 
 const STOP_WORDS = new Set([
   'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'how', 'in', 'is', 'it',
@@ -57,6 +63,15 @@ const STOP_WORDS = new Set([
   'can', 'could', 'would', 'should', 'there', 'their', 'them', 'they', 'you', 'please',
   'tell', 'say', 'says', 'mean', 'means', 'into', 'have', 'has', 'had', 'more', 'less',
   'than', 'then', 'also', 'just', 'like', 'uh', 'um', 'hmm', 'okay', 'ok',
+]);
+
+const COMMON_TYPO_MAP = new Map<string, string>([
+  ['fpdmap', 'fodmap'],
+  ['fodmop', 'fodmap'],
+  ['fodpam', 'fodmap'],
+  ['lactoluse', 'lactulose'],
+  ['methan', 'methane'],
+  ['siboo', 'sibo'],
 ]);
 
 function normalizeText(value: string): string {
@@ -87,6 +102,111 @@ function tokenize(value: string): string[] {
   const uniqueTerms = new Set<string>();
   for (const term of terms) uniqueTerms.add(term);
   return [...uniqueTerms];
+}
+
+function buildTypoLexicon(chunks: ChunkRecord[]) {
+  const frequency = new Map<string, number>();
+  for (const chunk of chunks) {
+    const tokens = normalizeText(`${chunk.title} ${chunk.content}`).split(' ');
+    for (const token of tokens) {
+      if (token.length < 4 || token.length > 24) continue;
+      if (STOP_WORDS.has(token)) continue;
+      if (!/[a-z]/.test(token)) continue;
+      if (/^\d+$/.test(token)) continue;
+      frequency.set(token, (frequency.get(token) ?? 0) + 1);
+    }
+  }
+
+  const maxTerms = Number.isFinite(lexiconMaxTerms) && lexiconMaxTerms > 1000
+    ? Math.floor(lexiconMaxTerms)
+    : 15000;
+  const sorted = [...frequency.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, maxTerms);
+
+  lexiconTerms = sorted.map(([term]) => term);
+  lexiconSet = new Set(lexiconTerms);
+  lexiconFrequency = new Map(sorted);
+}
+
+function levenshteinWithin(a: string, b: string, maxDistance: number): number {
+  if (a === b) return 0;
+  if (maxDistance < 0) return maxDistance + 1;
+  if (Math.abs(a.length - b.length) > maxDistance) return maxDistance + 1;
+
+  let previous = new Array<number>(b.length + 1);
+  for (let j = 0; j <= b.length; j += 1) previous[j] = j;
+
+  for (let i = 1; i <= a.length; i += 1) {
+    const current = new Array<number>(b.length + 1);
+    current[0] = i;
+    let rowMin = current[0];
+
+    for (let j = 1; j <= b.length; j += 1) {
+      const insertCost = current[j - 1] + 1;
+      const deleteCost = previous[j] + 1;
+      const replaceCost = previous[j - 1] + (a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1);
+      current[j] = Math.min(insertCost, deleteCost, replaceCost);
+      if (current[j] < rowMin) rowMin = current[j];
+    }
+
+    if (rowMin > maxDistance) return maxDistance + 1;
+    previous = current;
+  }
+
+  return previous[b.length];
+}
+
+function resolveTypoToken(term: string): string | null {
+  if (COMMON_TYPO_MAP.has(term)) return COMMON_TYPO_MAP.get(term) ?? null;
+  if (term.length < 4 || term.length > 24) return null;
+  if (lexiconSet.has(term)) return null;
+  if (lexiconTerms.length === 0) return null;
+
+  const maxDistance = Number.isFinite(typoMaxEditDistance) && typoMaxEditDistance >= 1
+    ? Math.min(3, Math.floor(typoMaxEditDistance))
+    : 2;
+  let bestToken: string | null = null;
+  let bestDistance = maxDistance + 1;
+  let bestFrequency = -1;
+
+  for (const candidate of lexiconTerms) {
+    if (Math.abs(candidate.length - term.length) > maxDistance) continue;
+    if (candidate[0] !== term[0]) continue;
+    const distance = levenshteinWithin(term, candidate, bestDistance - 1);
+    if (distance > maxDistance) continue;
+
+    const frequency = lexiconFrequency.get(candidate) ?? 0;
+    if (
+      distance < bestDistance ||
+      (distance === bestDistance && frequency > bestFrequency)
+    ) {
+      bestToken = candidate;
+      bestDistance = distance;
+      bestFrequency = frequency;
+    }
+  }
+
+  if (!bestToken || STOP_WORDS.has(bestToken)) return null;
+  return bestToken;
+}
+
+function expandTypoTerms(baseTerms: string[]): string[] {
+  const expanded = new Set(baseTerms);
+  for (const term of baseTerms) {
+    const corrected = resolveTypoToken(term);
+    if (corrected) expanded.add(corrected);
+  }
+  return [...expanded];
+}
+
+function buildLunrQuery(terms: string[]): string {
+  const parts: string[] = [];
+  for (const term of terms) {
+    parts.push(`${term}*`);
+    if (term.length >= 5) parts.push(`${term}~1`);
+  }
+  return parts.join(' ');
 }
 
 function sanitizeKnowledgeText(value: string): string {
@@ -211,6 +331,8 @@ function ensureIndex() {
       this.add(chunk);
     }
   });
+
+  buildTypoLexicon(cachedChunks);
 }
 
 function keywordStats(chunk: ChunkRecord, queryTerms: string[]) {
@@ -244,13 +366,13 @@ export function retrieveNihCitations(question: string, topK = defaultTopK): NihC
   ensureIndex();
   if (!index || cachedChunks.length === 0) return [];
 
-  const queryTerms = expandDomainTerms(tokenize(question));
+  const queryTerms = expandDomainTerms(expandTypoTerms(tokenize(question)));
   if (queryTerms.length === 0) return [];
 
   const scored = new Map<string, {chunk: ChunkRecord; lunrScore: number; keyword: number; matchedTerms: number}>();
 
   try {
-    const lunrQuery = queryTerms.map((term) => `${term}*`).join(' ');
+    const lunrQuery = buildLunrQuery(queryTerms);
     const lunrHits = index.search(lunrQuery).slice(0, Math.max(25, topK * 4));
     for (const hit of lunrHits) {
       const chunk = cachedChunks.find((item) => item.id === hit.ref);
