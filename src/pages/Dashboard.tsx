@@ -3,7 +3,6 @@ import {
   Activity,
   Clock,
   FileText,
-  ChevronRight,
   Sprout,
 } from 'lucide-react';
 import {
@@ -165,7 +164,6 @@ export default function Dashboard() {
     rememberText: isHr
       ? 'Zastoji su normalni. Fokusiraj se na napredak koji si napravio i ostani dosljedan svom planu.'
       : "Setbacks are normal. Focus on the progress you've made and stay consistent with your plan.",
-    successCta: isHr ? 'SIBO uspjesi' : 'SIBO Success',
     commonPattern: isHr ? 'Uobičajeni obrazac SIBO simptoma' : 'Common SIBO Symptom Pattern',
     commonPatternText: isHr
       ? 'Simptomi često variraju zbog vremena obroka, vrste hrane, stresa i kvalitete sna. Praćenje kontinuiteta kroz vrijeme obično daje jasniji uvid nego promatranje samo jednog dana.'
@@ -363,14 +361,6 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-
-          <button
-            onClick={() => navigate('/sibo-success')}
-            className="mt-6 w-full bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
-          >
-            {copy.successCta}
-            <ChevronRight className="w-4 h-4" />
-          </button>
         </div>
       </div>
 
@@ -413,6 +403,7 @@ export default function Dashboard() {
     </div>
   );
 }
+
 
 
 

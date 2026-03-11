@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -23,7 +23,6 @@ const BreathTests = React.lazy(() => import('./pages/BreathTests'));
 const FoodHub = React.lazy(() => import('./pages/FoodHub'));
 const Education = React.lazy(() => import('./pages/Education'));
 const NIHEvidence = React.lazy(() => import('./pages/NIHEvidence'));
-const SiboSuccess = React.lazy(() => import('./pages/SiboSuccess'));
 const DoctorReport = React.lazy(() => import('./pages/DoctorReport'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 
@@ -66,7 +65,6 @@ function AppRoutes() {
           <Route path="/food-hub" element={<FoodHub />} />
           <Route path="/education" element={<Education />} />
           <Route path="/nih-evidence" element={<NIHEvidence />} />
-          <Route path="/sibo-success" element={<SiboSuccess />} />
           <Route path="/summary" element={<DoctorReport />} />
           <Route path="/doctor-report" element={<Navigate to="/summary" replace />} />
           <Route path="/settings" element={<Settings />} />

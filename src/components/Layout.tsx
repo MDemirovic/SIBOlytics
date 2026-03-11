@@ -11,7 +11,6 @@ import {
   Wind,
   LogOut,
   User as UserIcon,
-  Heart,
   Bot,
   Home,
   Menu,
@@ -30,7 +29,6 @@ const routePrefetchers: Record<string, () => void> = {
   '/food-hub': () => { void import('../pages/FoodHub'); },
   '/education': () => { void import('../pages/Education'); },
   '/nih-evidence': () => { void import('../pages/NIHEvidence'); },
-  '/sibo-success': () => { void import('../pages/SiboSuccess'); },
   '/summary': () => { void import('../pages/DoctorReport'); },
   '/settings': () => { void import('../pages/Settings'); },
   '/onboarding': () => { void import('../pages/Onboarding'); },
@@ -46,7 +44,6 @@ const languageCopy = {
       foodHub: 'Food Hub',
       education: 'Education',
       nihAssistant: 'NIH AI Assistant',
-      siboSuccess: 'SIBO Success',
       doctorReport: 'Clinical Summary',
       settings: 'Settings',
     },
@@ -64,8 +61,6 @@ const languageCopy = {
       educationSubtitle: 'Explore evidence-based information about SIBO and IBS.',
       nihTitle: 'NIH AI Assistant',
       nihSubtitle: 'Ask questions answered strictly using NIH sources.',
-      successTitle: 'SIBO Success',
-      successSubtitle: 'Success stories and relapse prevention strategies.',
       doctorReportTitle: 'Summary',
       doctorReportSubtitle: 'Personalized overview for patients and clinicians you can print or export.',
       settingsTitle: 'Settings',
@@ -91,7 +86,6 @@ const languageCopy = {
       foodHub: 'Prehrana',
       education: 'Edukacija',
       nihAssistant: 'NIH AI Asistent',
-      siboSuccess: 'SIBO Uspjesi',
       doctorReport: 'Sažetak',
       settings: 'Postavke',
     },
@@ -109,8 +103,6 @@ const languageCopy = {
       educationSubtitle: 'IstraĹľi informacije o SIBO i IBS temeljene na dokazima.',
       nihTitle: 'NIH AI Asistent',
       nihSubtitle: 'Postavi pitanje i dobij odgovor koristeÄ‡i samo NIH izvore.',
-      successTitle: 'SIBO Uspjesi',
-      successSubtitle: 'PriÄŤe o uspjehu i strategije prevencije relapsa.',
       doctorReportTitle: 'Sažetak',
       doctorReportSubtitle: 'Personalizirani pregled za pacijenta i kliničara koji možeš ispisati ili izvesti.',
       settingsTitle: 'Postavke',
@@ -213,8 +205,6 @@ export default function Layout() {
         return { title: copy.header.educationTitle, subtitle: copy.header.educationSubtitle };
       case '/nih-evidence':
         return { title: copy.header.nihTitle, subtitle: copy.header.nihSubtitle };
-      case '/sibo-success':
-        return { title: copy.header.successTitle, subtitle: copy.header.successSubtitle };
       case '/summary':
       case '/doctor-report':
         return { title: copy.header.doctorReportTitle, subtitle: copy.header.doctorReportSubtitle };
@@ -266,7 +256,6 @@ export default function Layout() {
           <NavItem icon={<Utensils />} label={copy.nav.foodHub} to="/food-hub" onPrefetch={routePrefetchers['/food-hub']} />
           <NavItem icon={<BookOpen />} label={copy.nav.education} to="/education" onPrefetch={routePrefetchers['/education']} />
           <NavItem icon={<Bot />} label={copy.nav.nihAssistant} to="/nih-evidence" onPrefetch={routePrefetchers['/nih-evidence']} />
-          <NavItem icon={<Heart />} label={copy.nav.siboSuccess} to="/sibo-success" onPrefetch={routePrefetchers['/sibo-success']} />
           <NavItem icon={<FileText />} label={copy.nav.doctorReport} to="/summary" onPrefetch={routePrefetchers['/summary']} />
         </nav>
 
