@@ -362,6 +362,13 @@ function countContainedTerms(text: string, terms: string[]): number {
   return count;
 }
 
+function requiredTermMatches(queryTerms: string[]): number {
+  if (queryTerms.length <= 1) return 1;
+  if (queryTerms.length <= 3) return 2;
+  if (queryTerms.length <= 7) return 2;
+  return 3;
+}
+
 export function retrieveNihCitations(question: string, topK = defaultTopK): NihCitation[] {
   ensureIndex();
   if (!index || cachedChunks.length === 0) return [];
@@ -417,9 +424,10 @@ export function retrieveNihCitations(question: string, topK = defaultTopK): NihC
     : [];
 
   const basePool = gasFocusedCandidates.length > 0 ? gasFocusedCandidates : rankedCandidates;
-  const minMatches = queryTerms.length >= 6 ? 2 : 1;
+  const minMatches = requiredTermMatches(queryTerms);
   const filteredByCoverage = basePool.filter((item) => item.matchedTerms >= minMatches);
-  const pool = filteredByCoverage.length > 0 ? filteredByCoverage : basePool;
+  if (filteredByCoverage.length === 0) return [];
+  const pool = filteredByCoverage;
 
   const ranked = pool
     .sort((a, b) => combinedScore(b) - combinedScore(a))
