@@ -59,6 +59,14 @@ const parseNumberish = (value: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const parseMinuteFromSampleToken = (value: unknown): number | null => {
+  if (typeof value !== 'string') return null;
+  const normalized = value.replace(/[\u2013\u2014]/g, '-').trim();
+  const match = normalized.match(/#?\s*\d+\s*-\s*(\d{1,3})\b/);
+  if (!match?.[1]) return null;
+  return parseNumberish(match[1]);
+};
+
 const toBreathDataPoint = (minute: number, h2: number, ch4: number): BreathDataPoint | null => {
   const minuteRounded = Math.round(minute);
   const h2Rounded = Math.round(h2);
@@ -88,6 +96,40 @@ const dedupeAndSort = (points: BreathDataPoint[]): BreathDataPoint[] => {
   return [...byMinute.values()].sort((a, b) => a.minute - b.minute);
 };
 
+const parseStructuredBreathRows = (text: string): BreathDataPoint[] => {
+  const lines = text
+    .replace(/[\u2013\u2014]/g, '-')
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+
+  const points: BreathDataPoint[] = [];
+
+  for (const line of lines) {
+    // Common row format in many reports: "#3 - 60 10:02 AM 82 14 ..."
+    const sampleMatch = line.match(/#\s*\d+\s*-\s*(\d{1,3})\b/i);
+    if (!sampleMatch?.[1]) continue;
+
+    const minute = parseNumberish(sampleMatch[1]);
+    if (minute === null) continue;
+
+    const rowTail = line.slice(line.indexOf(sampleMatch[0]) + sampleMatch[0].length).trim();
+    const withoutTime = rowTail.replace(/^\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?\b/i, '').trim();
+    const numericValues = (withoutTime.match(/-?\d+(?:[.,]\d+)?/g) ?? [])
+      .map((token) => parseNumberish(token))
+      .filter((value): value is number => value !== null);
+
+    if (numericValues.length < 2) continue;
+
+    const point = toBreathDataPoint(minute, numericValues[0], numericValues[1]);
+    if (point) {
+      points.push(point);
+    }
+  }
+
+  return dedupeAndSort(points);
+};
+
 const pickPointFromNumericValues = (values: number[]): BreathDataPoint | null => {
   if (values.length < 3) return null;
 
@@ -100,6 +142,11 @@ const pickPointFromNumericValues = (values: number[]): BreathDataPoint | null =>
 };
 
 const parseTextToDataPoints = (text: string): BreathDataPoint[] => {
+  const structuredRows = parseStructuredBreathRows(text);
+  if (structuredRows.length >= MIN_REQUIRED_POINTS) {
+    return structuredRows;
+  }
+
   const lines = text.split(/\r?\n/);
   const points: BreathDataPoint[] = [];
 
@@ -134,6 +181,10 @@ const parseRowsWithHeader = (rows: Record<string, unknown>[]): BreathDataPoint[]
     const normalized = normalizeHeader(key);
     return normalized.includes('minute') || normalized === 'min' || normalized === 'time';
   });
+  const sampleKey = keys.find((key) => {
+    const normalized = normalizeHeader(key);
+    return normalized.includes('sample');
+  });
   const h2Key = keys.find((key) => {
     const normalized = normalizeHeader(key);
     return normalized.includes('h2') || normalized.includes('hydrogen');
@@ -143,12 +194,14 @@ const parseRowsWithHeader = (rows: Record<string, unknown>[]): BreathDataPoint[]
     return normalized.includes('ch4') || normalized.includes('methane');
   });
 
-  if (!minuteKey || !h2Key || !ch4Key) return [];
+  if ((!minuteKey && !sampleKey) || !h2Key || !ch4Key) return [];
 
   const points: BreathDataPoint[] = [];
 
   for (const row of rows) {
-    const minute = parseNumberish(row[minuteKey]);
+    const minute = minuteKey
+      ? parseNumberish(row[minuteKey])
+      : parseMinuteFromSampleToken(row[sampleKey as string]);
     const h2 = parseNumberish(row[h2Key]);
     const ch4 = parseNumberish(row[ch4Key]);
     if (minute === null || h2 === null || ch4 === null) continue;
@@ -239,8 +292,34 @@ const extractPdfText = async (pdf: any): Promise<string> => {
   for (let i = 1; i <= pdf.numPages; i += 1) {
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
-    const pageText = textContent.items.map((item: any) => item.str).join(' ');
-    fullText += `${pageText}\n`;
+    const rows: Array<{ y: number; items: Array<{ x: number; text: string }> }> = [];
+
+    for (const item of textContent.items as any[]) {
+      const text = String(item?.str ?? '').trim();
+      if (!text) continue;
+
+      const x = Number(item?.transform?.[4] ?? 0);
+      const y = Number(item?.transform?.[5] ?? 0);
+      const existing = rows.find((row) => Math.abs(row.y - y) <= 2);
+
+      if (existing) {
+        existing.items.push({ x, text });
+      } else {
+        rows.push({ y, items: [{ x, text }] });
+      }
+    }
+
+    rows.sort((a, b) => b.y - a.y);
+    const pageLines = rows.map((row) =>
+      row.items
+        .sort((a, b) => a.x - b.x)
+        .map((part) => part.text)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    );
+
+    fullText += `${pageLines.join('\n')}\n`;
   }
 
   return fullText;
