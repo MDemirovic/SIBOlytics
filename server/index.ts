@@ -816,11 +816,29 @@ app.post('/api/nih/chat', requireAuth, async (req: AuthenticatedRequest, res) =>
   }
 
   try {
-    const result = await generateNihAnswer(question, language as NihLanguage, boundedCitations);
+    let result = await generateNihAnswer(question, language as NihLanguage, boundedCitations);
     const allowedIds = new Set(boundedCitations.map((item) => item.id));
-    const citationIds = extractValidCitationIds(result.answer, allowedIds);
+    let citationIds = extractValidCitationIds(result.answer, allowedIds);
 
     if (citationIds.length === 0) {
+      const retryResult = await generateNihAnswer(
+        question,
+        language as NihLanguage,
+        boundedCitations,
+        {forceCitationTokens: true}
+      );
+      const retryCitationIds = extractValidCitationIds(retryResult.answer, allowedIds);
+      if (retryCitationIds.length > 0) {
+        result = retryResult;
+        citationIds = retryCitationIds;
+      }
+    }
+
+    if (citationIds.length === 0) {
+      console.warn('[NIH_CHAT_CITATION_PARSE_FAILED]', {
+        questionPreview: question.slice(0, 160),
+        answerPreview: result.answer.slice(0, 260),
+      });
       sendNihError(res, 422, 'NO_VALID_CITATIONS', 'Model answer did not include valid citations.');
       return;
     }
@@ -1389,3 +1407,4 @@ startServer().catch((error) => {
 
 
 
+ 

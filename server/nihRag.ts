@@ -27,6 +27,10 @@ export type NihCitation = {
   content: string;
 };
 
+export type GenerateNihAnswerOptions = {
+  forceCitationTokens?: boolean;
+};
+
 type NihLlmProvider = 'gemini' | 'groq';
 
 const defaultTopK = Number(process.env.NIH_TOP_K ?? 6);
@@ -181,21 +185,38 @@ export function retrieveNihCitations(question: string, topK = defaultTopK): NihC
   }));
 }
 
-function buildPrompt(question: string, citations: NihCitation[], language: NihLanguage): string {
+function buildPrompt(
+  question: string,
+  citations: NihCitation[],
+  language: NihLanguage,
+  forceCitationTokens = false
+): string {
   const languageInstruction = language === 'hr'
     ? 'Odgovaraj na hrvatskom jeziku.'
     : 'Answer in English.';
+  const allowedCitationTokens = citations.map((citation) => `[${citation.id}]`).join(', ');
 
   const contextBlock = citations
     .map((citation) => `[${citation.id}] Title: ${citation.title}\nURL: ${citation.url}\nContent: ${citation.content}`)
     .join('\n\n');
+
+  const citationFormatInstructions = forceCitationTokens
+    ? [
+        `Allowed citation tokens: ${allowedCitationTokens}.`,
+        'You MUST include at least one allowed citation token exactly as written (example: [C1]).',
+        'If context is insufficient, say so and still cite the closest available context token.',
+      ]
+    : [
+        `Allowed citation tokens: ${allowedCitationTokens}.`,
+        'Every factual claim must include citation tokens in format [C#].',
+      ];
 
   return [
     'You are NIH Evidence Bot for SIBOlytics.',
     'Use ONLY the provided NIH context.',
     'Do not use external knowledge.',
     'If context is insufficient, say so explicitly.',
-    'Every factual claim must include citation tokens in format [C#].',
+    ...citationFormatInstructions,
     languageInstruction,
     '',
     `User question: ${question}`,
@@ -284,20 +305,32 @@ async function generateWithGroq(prompt: string): Promise<{answer: string; model:
 export async function generateNihAnswer(
   question: string,
   language: NihLanguage,
-  citations: NihCitation[]
+  citations: NihCitation[],
+  options: GenerateNihAnswerOptions = {}
 ): Promise<{answer: string; model: string}> {
-  const prompt = buildPrompt(question, citations, language);
+  const prompt = buildPrompt(question, citations, language, Boolean(options.forceCitationTokens));
   if (llmProvider === 'groq') return generateWithGroq(prompt);
   return generateWithGemini(prompt);
 }
 
 export function extractValidCitationIds(answer: string, allowedIds: Set<string>): string[] {
-  const matches = answer.match(/\[C\d+\]/g) ?? [];
   const valid = new Set<string>();
-  for (const match of matches) {
-    const id = match.slice(1, -1);
-    if (allowedIds.has(id)) valid.add(id);
+  const registerId = (rawId: string) => {
+    const compact = rawId.replace(/\s+/g, '').toUpperCase();
+    const normalized = /^\d+$/.test(compact) ? `C${compact}` : compact;
+    if (allowedIds.has(normalized)) valid.add(normalized);
+  };
+
+  const bracketMatches = answer.matchAll(/\[\s*([cC]?\s*\d+)\s*\]/g);
+  for (const match of bracketMatches) {
+    if (match[1]) registerId(match[1]);
   }
+
+  const bareMatches = answer.matchAll(/\b[cC]\s*(\d+)\b/g);
+  for (const match of bareMatches) {
+    if (match[1]) registerId(`C${match[1]}`);
+  }
+
   return [...valid];
 }
 
