@@ -88,7 +88,7 @@ function loadCacheDocs(): ChunkRecord[] {
   for (const fileName of files) {
     try {
       const fullPath = path.join(cacheDir, fileName);
-      const raw = readFileSync(fullPath, 'utf-8');
+      const raw = readFileSync(fullPath, 'utf-8').replace(/^\uFEFF/, '');
       const doc = JSON.parse(raw) as CachedDoc;
       if (!doc || !Array.isArray(doc.chunks)) continue;
 
@@ -102,8 +102,9 @@ function loadCacheDocs(): ChunkRecord[] {
           content,
         });
       });
-    } catch {
-      // Skip malformed cache files.
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Unknown parse error';
+      console.warn(`[NIH_CACHE_SKIP] ${fileName}: ${reason}`);
     }
   }
 
