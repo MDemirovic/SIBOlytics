@@ -1,6 +1,8 @@
 import React from 'react';
 import { Trash2, Activity } from 'lucide-react';
 import { BreathTest } from '../../types/breathTest';
+import { analyzeBreathTest } from '../../utils/breathInterpretation';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface TestHistoryProps {
   tests: BreathTest[];
@@ -9,44 +11,53 @@ interface TestHistoryProps {
   onDelete: (id: string) => void;
 }
 
+type LabelTone = 'h2' | 'ch4' | 'mixed' | 'late' | 'normal';
+
 export default function TestHistory({ tests, selectedTestId, onSelect, onDelete }: TestHistoryProps) {
+  const { isHr } = useLanguage();
+
   if (tests.length === 0) {
     return (
       <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm text-center">
-        <p className="text-sm text-slate-400">No tests saved yet.</p>
+        <p className="text-sm text-slate-400">{isHr ? 'Nema spremljenih testova.' : 'No tests saved yet.'}</p>
       </div>
     );
   }
 
-  const getLabel = (test: BreathTest) => {
-    if (!test.data || test.data.length === 0) return 'No Data';
-    const baselineH2 = test.data[0]?.h2 || 0;
-    const peakH2 = Math.max(...test.data.map(d => d.h2));
-    const peakCH4 = Math.max(...test.data.map(d => d.ch4));
-    
-    const h2Rise = peakH2 - baselineH2;
-    const isH2Positive = h2Rise >= 20;
-    const isCH4Positive = peakCH4 >= 10;
+  const getLabel = (test: BreathTest): { label: string; tone: LabelTone } => {
+    const analysis = analyzeBreathTest(test);
 
-    if (isH2Positive && isCH4Positive) return 'Mixed Pattern';
-    if (isH2Positive) return 'H2 Dominant';
-    if (isCH4Positive) return 'CH4 Dominant';
-    return 'Normal Pattern';
+    switch (analysis.pattern) {
+      case 'mixed_sibo_imo':
+        return { label: isHr ? 'Mjesoviti (SIBO+IMO)' : 'Mixed (SIBO+IMO)', tone: 'mixed' };
+      case 'hydrogen_sibo':
+        return { label: isHr ? 'H2 pozitivan (<=90)' : 'H2 Positive (<=90)', tone: 'h2' };
+      case 'methane_imo':
+        return { label: isHr ? 'CH4 dominantan (IMO)' : 'CH4 Dominant (IMO)', tone: 'ch4' };
+      case 'methane_with_late_h2':
+        return { label: isHr ? 'IMO + kasni H2' : 'IMO + Late H2', tone: 'late' };
+      case 'late_h2_colonic':
+        return { label: isHr ? 'Kasni H2 porast (>90)' : 'Late H2 Rise (>90)', tone: 'late' };
+      case 'insufficient':
+        return { label: isHr ? 'Nema podataka' : 'No Data', tone: 'normal' };
+      default:
+        return { label: isHr ? 'Normalan obrazac' : 'Normal Pattern', tone: 'normal' };
+    }
   };
 
   return (
     <div className="flex flex-col gap-3">
       {tests.map(test => {
-        const date = new Date(test.testDate ?? test.createdAt).toLocaleDateString();
+        const date = new Date(test.testDate ?? test.createdAt).toLocaleDateString(isHr ? 'hr-HR' : 'en-US');
         const isSelected = test.id === selectedTestId;
-        const label = getLabel(test);
-        
+        const { label, tone } = getLabel(test);
+
         return (
-          <div 
+          <div
             key={test.id}
             className={`flex flex-col p-4 rounded-2xl transition-all cursor-pointer border ${
-              isSelected 
-                ? 'bg-blue-900/20 border-blue-500/50 shadow-lg shadow-blue-900/10' 
+              isSelected
+                ? 'bg-blue-900/20 border-blue-500/50 shadow-lg shadow-blue-900/10'
                 : 'bg-slate-900/40 border-slate-800 hover:border-slate-700 hover:bg-slate-900/60'
             }`}
             onClick={() => onSelect(test.id)}
@@ -58,28 +69,29 @@ export default function TestHistory({ tests, selectedTestId, onSelect, onDelete 
                 </div>
                 <div>
                   <p className={`text-sm font-medium ${isSelected ? 'text-white' : 'text-slate-200'}`}>
-                    <span className="capitalize">{test.substrate}</span> Test
+                    <span className="capitalize">{test.substrate}</span> {isHr ? 'Test' : 'Test'}
                   </p>
                   <p className="text-xs text-slate-500">{date}</p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onDelete(test.id);
                 }}
                 className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                title="Delete test"
+                title={isHr ? 'Obrisi test' : 'Delete test'}
               >
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
-            
+
             <div className="flex items-center justify-between mt-auto">
               <span className={`text-xs font-medium px-2.5 py-1 rounded-md border ${
-                label.includes('H2') ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                label.includes('CH4') ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                label.includes('Mixed') ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+                tone === 'h2' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                tone === 'ch4' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                tone === 'mixed' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+                tone === 'late' ? 'bg-amber-500/10 text-amber-300 border-amber-500/30' :
                 'bg-slate-800 text-slate-300 border-slate-700'
               }`}>
                 {label}
@@ -96,4 +108,3 @@ export default function TestHistory({ tests, selectedTestId, onSelect, onDelete 
     </div>
   );
 }
-

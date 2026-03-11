@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, Download, FileText, Printer, Utensils, Wind } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -6,6 +6,7 @@ import { getBreathTests, getFoodLogs, getOnboardingData, getSymptomEntries } fro
 import { BreathTest } from '../types/breathTest';
 import { LoggedFood, OnboardingData } from '../types/health';
 import { SymptomDiaryEntry } from '../types/symptomDiary';
+import { analyzeBreathTest, BREATH_THRESHOLDS } from '../utils/breathInterpretation';
 
 const SYMPTOM_FIELDS = ['pain', 'bloating', 'diarrhea', 'stress', 'sleep', 'energy', 'stool'] as const;
 type SymptomField = (typeof SYMPTOM_FIELDS)[number];
@@ -48,47 +49,62 @@ function getPeaks(test: BreathTest) {
 }
 
 function getBreathInterpretation(test: BreathTest, isHr: boolean) {
-  if (!test.data || test.data.length === 0) {
+  const analysis = analyzeBreathTest(test);
+  if (!analysis.hasData) {
     return {
       title: isHr ? 'Nedovoljno podataka' : 'Insufficient Data',
-      description: isHr ? 'Nema toÄŤki mjerenja u testu.' : 'No measurement points found in this test.',
+      description: isHr ? 'Nema tocki mjerenja u testu.' : 'No measurement points found in this test.',
     };
   }
 
-  const { h2Rise, peakCH4, peakH2Minute } = getPeaks(test);
-  const isH2Positive = h2Rise >= 20;
-  const isCH4Positive = peakCH4 >= 10;
-
-  if (isH2Positive && isCH4Positive) {
+  if (analysis.pattern === 'mixed_sibo_imo') {
     return {
-      title: isHr ? 'MjeĹˇoviti obrazac (H2 + CH4)' : 'Mixed Pattern (H2 + CH4)',
+      title: isHr ? 'Mjesoviti obrazac (SIBO + IMO)' : 'Mixed Pattern (SIBO + IMO)',
       description: isHr
-        ? `H2 porast je ${h2Rise} ppm, a CH4 vrh ${peakCH4} ppm.`
-        : `H2 rise is ${h2Rise} ppm and CH4 peak is ${peakCH4} ppm.`,
+        ? `H2 porast >=${BREATH_THRESHOLDS.hydrogenRisePpm} ppm se dogodio do ${BREATH_THRESHOLDS.smallBowelWindowMinutes}. minute (+${analysis.h2Rise} ppm), a CH4 je dosegao ${analysis.peakCH4} ppm.`
+        : `H2 rise >=${BREATH_THRESHOLDS.hydrogenRisePpm} ppm occurred by ${BREATH_THRESHOLDS.smallBowelWindowMinutes} minutes (+${analysis.h2Rise} ppm), and CH4 peaked at ${analysis.peakCH4} ppm.`,
     };
   }
 
-  if (isH2Positive) {
+  if (analysis.pattern === 'hydrogen_sibo') {
     return {
-      title: isHr ? 'H2 dominantan obrazac' : 'Hydrogen Dominant Pattern',
+      title: isHr ? 'H2 pozitivan obrazac (<=90 min)' : 'Hydrogen Positive Pattern (<=90 min)',
       description: isHr
-        ? `H2 porast je ${h2Rise} ppm (vrh u ${peakH2Minute}. minuti).`
-        : `H2 rise is ${h2Rise} ppm (peak at minute ${peakH2Minute}).`,
+        ? `H2 porast je +${analysis.h2Rise} ppm (vrh u ${analysis.peakH2Minute}. minuti), uz kljucni porast do 90. minute.`
+        : `H2 rise is +${analysis.h2Rise} ppm (peak at minute ${analysis.peakH2Minute}), with the key rise happening by 90 minutes.`,
     };
   }
 
-  if (isCH4Positive) {
+  if (analysis.pattern === 'methane_with_late_h2') {
+    return {
+      title: isHr ? 'IMO + kasni H2 porast' : 'IMO + Late H2 Rise',
+      description: isHr
+        ? `CH4 je povisen (${analysis.peakCH4} ppm), ali H2 porast >=${BREATH_THRESHOLDS.hydrogenRisePpm} ppm nastupa tek nakon 90. minute (vjerojatnija kolonicna fermentacija nego rani SIBO signal).`
+        : `CH4 is elevated (${analysis.peakCH4} ppm), while H2 rise >=${BREATH_THRESHOLDS.hydrogenRisePpm} ppm appears only after 90 minutes (more compatible with colonic fermentation than early SIBO signal).`,
+    };
+  }
+
+  if (analysis.pattern === 'methane_imo') {
     return {
       title: isHr ? 'CH4 dominantan obrazac (IMO)' : 'Methane Dominant Pattern (IMO)',
-      description: isHr ? `CH4 vrh je ${peakCH4} ppm.` : `CH4 peak is ${peakCH4} ppm.`,
+      description: isHr ? `CH4 vrh je ${analysis.peakCH4} ppm.` : `CH4 peak is ${analysis.peakCH4} ppm.`,
+    };
+  }
+
+  if (analysis.pattern === 'late_h2_colonic') {
+    return {
+      title: isHr ? 'Kasni porast H2 (>90 min)' : 'Late H2 Rise (>90 min)',
+      description: isHr
+        ? `H2 porast je +${analysis.h2Rise} ppm, ali tek nakon 90. minute, sto je cesce kolonicni signal nego pozitivan rani SIBO obrazac.`
+        : `H2 rise is +${analysis.h2Rise} ppm, but only after 90 minutes, which is more often a colonic signal than a positive early SIBO pattern.`,
     };
   }
 
   return {
     title: isHr ? 'Normalan obrazac' : 'Normal Pattern',
     description: isHr
-      ? `Nema znaÄŤajnog porasta (H2 < 20 ppm i CH4 < 10 ppm).`
-      : `No significant rise detected (H2 < 20 ppm and CH4 < 10 ppm).`,
+      ? `Nema znacajnog porasta (H2 < ${BREATH_THRESHOLDS.hydrogenRisePpm} ppm do 90 min i CH4 < ${BREATH_THRESHOLDS.methanePpm} ppm).`
+      : `No significant rise detected (H2 < ${BREATH_THRESHOLDS.hydrogenRisePpm} ppm by 90 min and CH4 < ${BREATH_THRESHOLDS.methanePpm} ppm).`,
   };
 }
 
@@ -106,37 +122,37 @@ export default function DoctorReport() {
   const { isHr } = useLanguage();
 
   const copy = {
-    loginPrompt: isHr ? 'Prijavi se za pregled i izvoz personaliziranog izvjeĹˇtaja.' : 'Sign in to view and export your personalized report.',
-    title: isHr ? 'Personalizirani saĹľetak' : 'Personalized Summary',
+    loginPrompt: isHr ? 'Prijavi se za pregled i izvoz personaliziranog izvještaja.' : 'Sign in to view and export your personalized report.',
+    title: isHr ? 'Personalizirani sažetak' : 'Personalized Summary',
     subtitle: isHr
-      ? 'Jedna pregledna stranica za pacijenta i kliniÄŤara: baseline, simptomi, food triggeri i breath testovi.'
+      ? 'Jedna pregledna stranica za pacijenta i kliničara: baseline, simptomi, food triggeri i breath testovi.'
       : 'One clear page for patients and clinicians: baseline, symptoms, food triggers, and breath tests.',
     generatedOn: isHr ? 'Generirano' : 'Generated',
-    printPdf: isHr ? 'IspiĹˇi / Spremi PDF' : 'Print / Save PDF',
+    printPdf: isHr ? 'Ispiši / Spremi PDF' : 'Print / Save PDF',
     exportWord: isHr ? 'Preuzmi Word (.doc)' : 'Download Word (.doc)',
     patientInfo: isHr ? 'Podaci pacijenta' : 'Patient Information',
-    baseline: isHr ? 'PoÄŤetni baseline (onboarding)' : 'Initial Baseline (Onboarding)',
+    baseline: isHr ? 'Početni baseline (onboarding)' : 'Initial Baseline (Onboarding)',
     primarySymptom: isHr ? 'Primarni simptom' : 'Primary symptom',
-    severity: isHr ? 'PoÄŤetna teĹľina' : 'Initial severity',
+    severity: isHr ? 'Početna težina' : 'Initial severity',
     stoolPattern: isHr ? 'Uzorak stolice' : 'Stool pattern',
     suspectedTriggers: isHr ? 'Sumnjivi triggeri' : 'Suspected triggers',
     notProvided: isHr ? 'Nije uneseno' : 'Not provided',
-    symptomSummary: isHr ? 'SaĹľetak simptoma' : 'Symptom Summary',
+    symptomSummary: isHr ? 'Sažetak simptoma' : 'Symptom Summary',
     avgOverall: isHr ? 'Prosjek overall gut' : 'Average overall gut',
     latestOverall: isHr ? 'Zadnji overall gut' : 'Latest overall gut',
     totalLogs: isHr ? 'Ukupno symptom log unosa' : 'Total symptom log entries',
-    topBurdens: isHr ? 'Glavni simptom burden (niĹľi score = gore)' : 'Main symptom burdens (lower score = worse)',
+    topBurdens: isHr ? 'Glavni simptom burden (niži score = gore)' : 'Main symptom burdens (lower score = worse)',
     symptomAverages: isHr ? 'Prosjeci po simptomu' : 'Averages by symptom',
     recentSymptomLog: isHr ? 'Zadnji symptom log unosi' : 'Recent symptom log entries',
-    foodSummary: isHr ? 'SaĹľetak food triggera' : 'Food Trigger Summary',
-    topTriggers: isHr ? 'NajÄŤeĹˇÄ‡i triggeri' : 'Most frequent triggers',
-    triggerLog: isHr ? 'Trigger log (s biljeĹˇkama)' : 'Trigger log (with notes)',
-    breathSummary: isHr ? 'Breath test saĹľetak' : 'Breath Test Summary',
+    foodSummary: isHr ? 'Sažetak food triggera' : 'Food Trigger Summary',
+    topTriggers: isHr ? 'Najčešći triggeri' : 'Most frequent triggers',
+    triggerLog: isHr ? 'Trigger log (s bilješkama)' : 'Trigger log (with notes)',
+    breathSummary: isHr ? 'Breath test sažetak' : 'Breath Test Summary',
     latestBreath: isHr ? 'Zadnji breath test' : 'Latest breath test',
     noBreathTests: isHr ? 'Nema spremljenih breath testova.' : 'No saved breath tests.',
     breathHistory: isHr ? 'Povijest breath testova' : 'Breath test history',
     medicalNotice: isHr
-      ? 'Napomena: ovo je edukativni saĹľetak korisniÄŤkih unosa, nije dijagnoza.'
+      ? 'Napomena: ovo je edukativni sažetak korisničkih unosa, nije dijagnoza.'
       : 'Note: this is an educational summary of user-entered data, not a diagnosis.',
     noData: isHr ? 'Nema podataka' : 'No data',
     date: isHr ? 'Datum' : 'Date',
@@ -144,7 +160,7 @@ export default function DoctorReport() {
     pain: isHr ? 'Bol' : 'Pain',
     bloating: isHr ? 'Nadutost' : 'Bloating',
     stress: isHr ? 'Stres' : 'Stress',
-    notes: isHr ? 'BiljeĹˇke' : 'Notes',
+    notes: isHr ? 'Bilješke' : 'Notes',
     food: isHr ? 'Hrana' : 'Food',
     substrate: isHr ? 'Supstrat' : 'Substrate',
     h2Rise: isHr ? 'H2 porast' : 'H2 rise',
@@ -784,4 +800,5 @@ export default function DoctorReport() {
     </div>
   );
 }
+
 

@@ -7,6 +7,7 @@ import { BreathTest } from '../types/breathTest';
 import BreathChart from '../components/breath/BreathChart';
 import TestHistory from '../components/breath/TestHistory';
 import AddTestModal from '../components/breath/AddTestModal';
+import { analyzeBreathTest, BREATH_THRESHOLDS } from '../utils/breathInterpretation';
 
 export default function BreathTests() {
   const { user } = useAuth();
@@ -25,6 +26,8 @@ export default function BreathTests() {
     mixedPattern: isHr ? 'Mjesoviti obrazac (H2 i CH4)' : 'Mixed Pattern (H2 & CH4)',
     hydrogenPattern: isHr ? 'Hidrogen dominantan obrazac' : 'Hydrogen Dominant Pattern',
     methanePattern: isHr ? 'Metan dominantan obrazac (IMO)' : 'Methane Dominant Pattern (IMO)',
+    lateHydrogenPattern: isHr ? 'Kasni porast H2 (vjerojatno kolon)' : 'Late H2 Rise (Likely Colonic Fermentation)',
+    methaneLatePattern: isHr ? 'IMO + kasni porast H2' : 'IMO + Late H2 Rise',
     yourTests: isHr ? 'Tvoji izdisajni testovi' : 'Your Breath Tests',
     subtitle: isHr ? 'Odaberi spremljeni test pa pregledaj graf i tumacenje ispod.' : 'Choose a saved test, then review the chart and interpretation below.',
     addTest: isHr ? 'Dodaj test' : 'Add Test',
@@ -117,40 +120,51 @@ export default function BreathTests() {
   };
 
   const getInterpretation = (test: BreathTest) => {
-    if (!test.data || test.data.length === 0) {
+    const analysis = analyzeBreathTest(test);
+    if (!analysis.hasData) {
       return { title: copy.insufficient, desc: copy.emptyTest };
     }
 
-    const baselineH2 = test.data[0]?.h2 || 0;
-    const peakH2 = Math.max(...test.data.map((d) => d.h2));
-    const peakCH4 = Math.max(...test.data.map((d) => d.ch4));
-    const h2PeakData = test.data.find((d) => d.h2 === peakH2);
-    const h2PeakTime = h2PeakData ? h2PeakData.minute : 0;
-
-    const h2Rise = peakH2 - baselineH2;
-    const isH2Positive = h2Rise >= 20;
-    const isCH4Positive = peakCH4 >= 10;
-    const isEarlyRise = h2PeakTime <= 90;
+    const { h2Rise, peakCH4, peakH2Minute, firstH2PositiveMinute } = analysis;
 
     let title = copy.normalPattern;
     let desc = copy.normalDesc;
 
-    if (isH2Positive && isCH4Positive) {
-      title = copy.mixedPattern;
-      desc = isHr
-        ? `I hidrogen i metan pokazuju znacajan porast. Hidrogen je porastao za ${h2Rise} ppm, a metan je dosegao ${peakCH4} ppm. Ovakav obrazac je cesto povezan s kombiniranim simptomima.`
-        : `Both Hydrogen and Methane show significant elevations. Hydrogen rose by ${h2Rise} ppm and Methane peaked at ${peakCH4} ppm. This is often associated with mixed symptoms (bloating, altered bowel habits).`;
-    } else if (isH2Positive) {
-      title = copy.hydrogenPattern;
-      desc = isHr
-        ? `Hidrogen je porastao za ${h2Rise} ppm od pocetne vrijednosti, s vrhom u ${h2PeakTime}. minuti. ${isEarlyRise ? 'Rani porast (<=90 min) se cesto povezuje sa SIBO.' : 'Kasniji porast (>90 min) moze upucivati na fermentaciju u kolonu.'} Ovaj obrazac se cesto povezuje s proljevom.`
-        : `Hydrogen rose by ${h2Rise} ppm from baseline, peaking at minute ${h2PeakTime}. ${isEarlyRise ? 'An early rise (<=90 min) is classically associated with small intestinal bacterial overgrowth.' : 'A later rise (>90 min) may reflect colonic fermentation.'} This pattern is often associated with diarrhea-predominant symptoms.`;
-    } else if (isCH4Positive) {
-      title = copy.methanePattern;
-      desc = isHr
-        ? `Metan je dosegao ${peakCH4} ppm. Povisen metan u bilo kojoj tocki testa cesto je povezan sa zatvorom (Intestinal Methanogen Overgrowth).`
-        : `Methane peaked at ${peakCH4} ppm. Elevated methane at any point during the test is often associated with constipation-predominant symptoms (Intestinal Methanogen Overgrowth).`;
+    switch (analysis.pattern) {
+      case 'mixed_sibo_imo':
+        title = copy.mixedPattern;
+        desc = isHr
+          ? `H2 je porastao za ${h2Rise} ppm do ${BREATH_THRESHOLDS.smallBowelWindowMinutes}. minute (prvi znacajan porast u ${firstH2PositiveMinute}. minuti), a CH4 je dosegao ${peakCH4} ppm. Ovo je mjesoviti obrazac (SIBO + IMO).`
+          : `H2 rose by ${h2Rise} ppm by minute ${BREATH_THRESHOLDS.smallBowelWindowMinutes} (first significant rise at minute ${firstH2PositiveMinute}), and CH4 peaked at ${peakCH4} ppm. This is a mixed pattern (SIBO + IMO).`;
+        break;
+      case 'hydrogen_sibo':
+        title = copy.hydrogenPattern;
+        desc = isHr
+          ? `Hidrogen je porastao za ${h2Rise} ppm od pocetne vrijednosti, s vrhom u ${peakH2Minute}. minuti. Porast >=20 ppm do 90. minute je kompatibilan s pozitivnim H2 SIBO obrascem.`
+          : `Hydrogen rose by ${h2Rise} ppm from baseline, peaking at minute ${peakH2Minute}. A >=20 ppm rise by 90 minutes is compatible with a positive H2 SIBO pattern.`;
+        break;
+      case 'methane_with_late_h2':
+        title = copy.methaneLatePattern;
+        desc = isHr
+          ? `Metan je dosegao ${peakCH4} ppm (IMO obrazac). H2 porast >=20 ppm se pojavio tek nakon 90. minute, sto je cesce kolonicna fermentacija nego klasicni rani SIBO signal.`
+          : `Methane peaked at ${peakCH4} ppm (IMO pattern). The H2 rise >=20 ppm appeared only after 90 minutes, which is more compatible with colonic fermentation than classic early SIBO signal.`;
+        break;
+      case 'methane_imo':
+        title = copy.methanePattern;
+        desc = isHr
+          ? `Metan je dosegao ${peakCH4} ppm. Povisen metan u bilo kojoj tocki testa je kompatibilan s IMO obrascem.`
+          : `Methane peaked at ${peakCH4} ppm. Elevated methane at any point is compatible with an IMO pattern.`;
+        break;
+      case 'late_h2_colonic':
+        title = copy.lateHydrogenPattern;
+        desc = isHr
+          ? `Hidrogen je porastao za ${h2Rise} ppm, ali tek nakon 90. minute. Taj kasni porast je cesce signal kolonicne fermentacije i sam po sebi se ne tretira kao pozitivan rani H2 SIBO obrazac.`
+          : `Hydrogen rose by ${h2Rise} ppm, but only after 90 minutes. This late rise is more often a colonic fermentation signal and is not treated as a positive early H2 SIBO pattern by itself.`;
+        break;
+      default:
+        break;
     }
+
     return { title, desc };
   };
 
@@ -320,4 +334,5 @@ export default function BreathTests() {
     </div>
   );
 }
+
 
