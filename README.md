@@ -1,4 +1,4 @@
-﻿# SIBOlytics
+# SIBOlytics
 
 SIBOlytics is a full-stack app (React + Express + Postgres) for SIBO tracking.
 
@@ -8,6 +8,7 @@ SIBOlytics is a full-stack app (React + Express + Postgres) for SIBO tracking.
 - Backend: Express, TypeScript
 - Database: Postgres (Neon for free launch)
 - NIH RAG LLM: Gemini or Groq API (free-tier options)
+- Breath OCR: Mistral OCR API (`mistral-ocr-latest`) for JPG/PNG auto-extraction
 
 ## Dual Provider Support (Gemini + Groq)
 
@@ -36,12 +37,14 @@ Copy `.env.example` to `.env` and set:
 
 - `DATABASE_URL`
 - `API_PORT` (optional, default backend port is `3001`)
+- `API_JSON_LIMIT` (optional, default `12mb`, needed for base64 OCR payloads)
 - `NIH_LLM_PROVIDER` (`gemini` or `groq`)
 
 Provider keys/models:
 
 - Gemini: `GEMINI_API_KEY`, optional `NIH_LLM_MODEL` (default `gemini-2.0-flash`)
 - Groq: `GROQ_API_KEY`, optional `NIH_GROQ_MODEL` (default `llama-3.1-8b-instant`)
+- Breath OCR: `MISTRAL_API_KEY`, optional `BREATH_OCR_MODEL` (default `mistral-ocr-latest`)
 
 Optional NIH settings:
 
@@ -79,6 +82,7 @@ Open `http://localhost:3000`.
 - `NIH_LLM_PROVIDER=gemini` or `NIH_LLM_PROVIDER=groq`
 - if Gemini: `GEMINI_API_KEY=<your_google_ai_studio_key>`
 - if Groq: `GROQ_API_KEY=<your_groq_api_key>`
+- `MISTRAL_API_KEY=<your_mistral_api_key>`
 
 ### Recommended NIH env on Render
 
@@ -88,6 +92,11 @@ Open `http://localhost:3000`.
 - `NIH_MAX_CONTEXT_CHARS=10000` to `12000`
 - `NIH_MAX_QPS_PER_USER=1`
 - `NIH_MAX_REQ_PER_HOUR=30` to `50`
+- `API_JSON_LIMIT=12mb`
+- `BREATH_OCR_MODEL=mistral-ocr-latest`
+- `BREATH_OCR_TIMEOUT_MS=20000`
+- `BREATH_OCR_MAX_IMAGE_MB=8`
+- `BREATH_OCR_MAX_REQ_PER_HOUR=40`
 
 In production mode, backend serves both:
 
@@ -138,6 +147,54 @@ Note:
   "chunks": ["chunk text 1", "chunk text 2"]
 }
 ```
+
+## Breath OCR API
+
+### Endpoint
+
+- `POST /api/breath-tests/extract` (auth required)
+
+### Request body
+
+JSON payload (base64 image):
+
+```json
+{
+  "fileName": "my-test.jpg",
+  "mimeType": "image/jpeg",
+  "imageBase64": "<base64-without-data-prefix>"
+}
+```
+
+- Supported image types: JPG/JPEG and PNG
+- The backend calls Mistral OCR model `mistral-ocr-latest`
+
+### Success payload
+
+```json
+{
+  "success": true,
+  "data": {
+    "rows": [
+      { "minute": 0, "h2": 4, "ch4": 2 },
+      { "minute": 15, "h2": 9, "ch4": null }
+    ],
+    "detectedInterval": 15,
+    "warnings": ["Some values were not read confidently and were left blank for manual review."],
+    "model": "mistral-ocr-latest",
+    "provider": "mistral"
+  }
+}
+```
+
+### Error codes
+
+- `INVALID_INPUT`
+- `UNSUPPORTED_FILE_TYPE`
+- `FILE_TOO_LARGE`
+- `OCR_TIMEOUT`
+- `OCR_RATE_LIMIT`
+- `OCR_PROVIDER_ERROR`
 
 ## NIH Bot API
 
@@ -225,3 +282,5 @@ Add `/api/nih/limits` endpoint so UI can show local rate-limit remaining per hou
 ### Goal
 
 What I wanted to achieve in one sentence.
+
+

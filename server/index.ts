@@ -1,4 +1,4 @@
-﻿import 'dotenv/config';
+import 'dotenv/config';
 import crypto from 'node:crypto';
 import {existsSync} from 'node:fs';
 import path from 'node:path';
@@ -45,18 +45,25 @@ type BreathPointInput = {
 };
 
 const app = express();
-app.use(express.json({limit: '1mb'}));
-
 const port = Number(process.env.API_PORT ?? process.env.PORT ?? 3001);
 const databaseUrl = process.env.DATABASE_URL;
 const sessionCookieName = 'sibolytics_session';
 const sessionDurationDays = 7;
 const isProduction = process.env.NODE_ENV === 'production';
 const clientDistPath = path.resolve(process.cwd(), 'dist');
+const apiJsonLimit = process.env.API_JSON_LIMIT?.trim() || '12mb';
+const mistralApiKey = process.env.MISTRAL_API_KEY?.trim() ?? '';
+const breathOcrModel = (process.env.BREATH_OCR_MODEL ?? 'mistral-ocr-latest').trim() || 'mistral-ocr-latest';
+const breathOcrTimeoutMs = Number(process.env.BREATH_OCR_TIMEOUT_MS ?? 20000);
+const breathOcrMaxImageMb = Number(process.env.BREATH_OCR_MAX_IMAGE_MB ?? 8);
+const breathOcrMaxReqPerHour = Number(process.env.BREATH_OCR_MAX_REQ_PER_HOUR ?? 40);
+const breathOcrRateWindowMs = 60 * 60 * 1000;
 const nihMaxContextChars = Number(process.env.NIH_MAX_CONTEXT_CHARS ?? 18000);
 const nihMaxQpsPerUser = Number(process.env.NIH_MAX_QPS_PER_USER ?? 1);
 const nihMaxReqPerHour = Number(process.env.NIH_MAX_REQ_PER_HOUR ?? 30);
 const nihRateWindowMs = 60 * 60 * 1000;
+
+app.use(express.json({limit: apiJsonLimit}));
 
 type NihRateState = {
   windowStartMs: number;
@@ -489,6 +496,417 @@ function checkNihRateLimit(key: string, nowMs = Date.now()): boolean {
   nihRateMap.set(key, state);
   return true;
 }
+
+type BreathOcrApiErrorCode =
+  | 'INVALID_INPUT'
+  | 'UNSUPPORTED_FILE_TYPE'
+  | 'FILE_TOO_LARGE'
+  | 'OCR_TIMEOUT'
+  | 'OCR_RATE_LIMIT'
+  | 'OCR_PROVIDER_ERROR';
+
+type BreathOcrRateState = {
+  windowStartMs: number;
+  count: number;
+};
+
+type BreathOcrRow = {
+  minute: number;
+  h2: number | null;
+  ch4: number | null;
+  confidence?: number;
+};
+
+type BreathOcrFailure = {
+  status: number;
+  code: BreathOcrApiErrorCode;
+  message: string;
+};
+
+const breathOcrRateMap = new Map<string, BreathOcrRateState>();
+
+function sendBreathOcrError(res: Response, status: number, code: BreathOcrApiErrorCode, message: string) {
+  res.status(status).json({success: false, error: message, code});
+}
+
+function isBreathOcrFailure(value: unknown): value is BreathOcrFailure {
+  if (!value || typeof value !== 'object') return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj.status === 'number' &&
+    typeof obj.code === 'string' &&
+    typeof obj.message === 'string'
+  );
+}
+
+function checkBreathOcrRateLimit(key: string, nowMs = Date.now()): boolean {
+  if (breathOcrMaxReqPerHour <= 0) return true;
+
+  if (breathOcrRateMap.size > 20000) {
+    const cutoff = nowMs - breathOcrRateWindowMs;
+    for (const [entryKey, state] of breathOcrRateMap.entries()) {
+      if (state.windowStartMs < cutoff) breathOcrRateMap.delete(entryKey);
+    }
+  }
+
+  const previous = breathOcrRateMap.get(key);
+  if (!previous) {
+    breathOcrRateMap.set(key, {windowStartMs: nowMs, count: 1});
+    return true;
+  }
+
+  const state: BreathOcrRateState = {...previous};
+  if (nowMs - state.windowStartMs >= breathOcrRateWindowMs) {
+    state.windowStartMs = nowMs;
+    state.count = 0;
+  }
+
+  if (state.count >= breathOcrMaxReqPerHour) {
+    breathOcrRateMap.set(key, state);
+    return false;
+  }
+
+  state.count += 1;
+  breathOcrRateMap.set(key, state);
+  return true;
+}
+
+function normalizeBreathOcrMimeType(value: unknown): 'image/png' | 'image/jpeg' | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'image/png') return 'image/png';
+  if (normalized === 'image/jpeg' || normalized === 'image/jpg') return 'image/jpeg';
+  return null;
+}
+
+function normalizeBase64ImagePayload(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const payload = trimmed.startsWith('data:')
+    ? trimmed.slice(trimmed.indexOf(',') + 1)
+    : trimmed;
+
+  const compact = payload.replace(/\s+/g, '');
+  if (!compact) return null;
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(compact)) return null;
+
+  return compact;
+}
+
+function parseOcrNumber(token: string): number | null {
+  const cleaned = token
+    .replace(/,/g, '.')
+    .replace(/[^0-9.-]/g, '')
+    .trim();
+
+  if (!cleaned || cleaned === '-' || cleaned === '.' || cleaned === '-.') {
+    return null;
+  }
+
+  const parsed = Number(cleaned);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return parsed;
+}
+
+function parseMinuteToken(value: string): number | null {
+  const sampleMatch = value.match(/#?\s*\d+\s*-\s*(\d{1,3})\b/i);
+  if (sampleMatch?.[1]) {
+    const parsed = parseOcrNumber(sampleMatch[1]);
+    if (parsed !== null && Number.isInteger(parsed) && parsed >= 0 && parsed <= 360) {
+      return parsed;
+    }
+  }
+
+  const firstNumber = value.match(/\d{1,3}/);
+  if (!firstNumber?.[0]) return null;
+  const parsed = Number(firstNumber[0]);
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 360) return null;
+  return parsed;
+}
+
+function normalizeGasValue(value: number | null): number | null {
+  if (value === null) return null;
+  if (!Number.isFinite(value)) return null;
+  if (value < 0 || value > 500) return null;
+  return Math.round(value);
+}
+
+function rowCompletenessScore(row: BreathOcrRow): number {
+  return (row.h2 === null ? 0 : 1) + (row.ch4 === null ? 0 : 1);
+}
+
+function upsertBreathOcrRow(byMinute: Map<number, BreathOcrRow>, row: BreathOcrRow, warnings: string[]) {
+  const existing = byMinute.get(row.minute);
+  if (!existing) {
+    byMinute.set(row.minute, row);
+    return;
+  }
+
+  const existingScore = rowCompletenessScore(existing);
+  const candidateScore = rowCompletenessScore(row);
+  if (candidateScore > existingScore) {
+    byMinute.set(row.minute, row);
+  }
+
+  warnings.push('Duplicate minute ' + row.minute + ' detected. Keeping the most complete row.');
+}
+
+function parsePipeTableRows(text: string, byMinute: Map<number, BreathOcrRow>, warnings: string[]) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  let headerIndexes: {minute: number; h2: number; ch4: number} | null = null;
+
+  for (const line of lines) {
+    if (!line.includes('|')) continue;
+    const cells = line
+      .split('|')
+      .map((cell) => cell.trim())
+      .filter((cell) => cell.length > 0);
+
+    if (cells.length < 3) continue;
+
+    if (!headerIndexes) {
+      const normalized = cells.map((cell) =>
+        cell
+          .toLowerCase()
+          .normalize('NFKD')
+          .replace(/[^a-z0-9]/g, '')
+      );
+
+      const minuteIdx = normalized.findIndex((cell) => cell.includes('minute') || cell === 'min' || cell.includes('time'));
+      const h2Idx = normalized.findIndex((cell) => cell.includes('h2') || cell.includes('hydrogen'));
+      const ch4Idx = normalized.findIndex((cell) => cell.includes('ch4') || cell.includes('methane'));
+
+      if (minuteIdx >= 0 && h2Idx >= 0 && ch4Idx >= 0) {
+        headerIndexes = {minute: minuteIdx, h2: h2Idx, ch4: ch4Idx};
+      }
+      continue;
+    }
+
+    if (/^-+$/.test(cells.join(''))) continue;
+
+    const minuteCell = cells[headerIndexes.minute] ?? '';
+    const h2Cell = cells[headerIndexes.h2] ?? '';
+    const ch4Cell = cells[headerIndexes.ch4] ?? '';
+
+    const minute = parseMinuteToken(minuteCell);
+    if (minute === null) continue;
+
+    const h2 = normalizeGasValue(parseOcrNumber(h2Cell));
+    const ch4 = normalizeGasValue(parseOcrNumber(ch4Cell));
+
+    upsertBreathOcrRow(byMinute, {minute, h2, ch4}, warnings);
+  }
+}
+
+function parseLooseRows(text: string, byMinute: Map<number, BreathOcrRow>, warnings: string[]) {
+  const lines = text
+    .replace(/[\u2013\u2014]/g, '-')
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+
+  for (const rawLine of lines) {
+    if (!/\d/.test(rawLine)) continue;
+
+    const lineWithoutTime = rawLine
+      .replace(/\b\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?\b/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    let minute: number | null = null;
+    let tail = lineWithoutTime;
+
+    const sampleMatch = lineWithoutTime.match(/#?\s*\d+\s*-\s*\d{1,3}\b/i);
+    if (sampleMatch?.[0]) {
+      minute = parseMinuteToken(sampleMatch[0]);
+      tail = lineWithoutTime.slice(lineWithoutTime.indexOf(sampleMatch[0]) + sampleMatch[0].length).trim();
+    }
+
+    const numericTokens = (tail.match(/-?\d+(?:[.,]\d+)?/g) ?? [])
+      .map((token) => parseOcrNumber(token))
+      .filter((value): value is number => value !== null);
+
+    if (minute === null) {
+      if (numericTokens.length < 3) continue;
+      const candidateMinute = numericTokens[0];
+      if (!Number.isInteger(candidateMinute) || candidateMinute < 0 || candidateMinute > 360) continue;
+      minute = candidateMinute;
+      numericTokens.shift();
+    }
+
+    const h2 = normalizeGasValue(numericTokens.length > 0 ? numericTokens[0] : null);
+    const ch4 = normalizeGasValue(numericTokens.length > 1 ? numericTokens[1] : null);
+
+    if (h2 === null && ch4 === null) continue;
+
+    upsertBreathOcrRow(byMinute, {minute, h2, ch4}, warnings);
+  }
+}
+
+function detectBreathOcrInterval(rows: BreathOcrRow[]): 15 | 20 | null {
+  const minutes = [...new Set(rows.map((row) => row.minute))].sort((a, b) => a - b);
+  if (minutes.length < 3) return null;
+
+  let count15 = 0;
+  let count20 = 0;
+
+  for (let i = 1; i < minutes.length; i += 1) {
+    const diff = minutes[i] - minutes[i - 1];
+    if (diff === 15) count15 += 1;
+    if (diff === 20) count20 += 1;
+  }
+
+  if (count15 === 0 && count20 === 0) return null;
+  if (count15 > count20) return 15;
+  if (count20 > count15) return 20;
+  return null;
+}
+
+function parseBreathOcrRows(markdown: string): {rows: BreathOcrRow[]; warnings: string[]} {
+  const warnings: string[] = [];
+  const byMinute = new Map<number, BreathOcrRow>();
+
+  parsePipeTableRows(markdown, byMinute, warnings);
+  parseLooseRows(markdown, byMinute, warnings);
+
+  const rows = [...byMinute.values()].sort((a, b) => a.minute - b.minute);
+
+  if (rows.some((row) => row.h2 === null || row.ch4 === null)) {
+    warnings.push('Some values were not read confidently and were left blank for manual review.');
+  }
+
+  return {
+    rows,
+    warnings: [...new Set(warnings)],
+  };
+}
+
+async function readErrorMessageFromResponse(response: globalThis.Response): Promise<string | null> {
+  try {
+    const text = await response.text();
+    if (!text) return null;
+
+    try {
+      const payload = JSON.parse(text);
+      const message = payload?.message || payload?.error || payload?.detail;
+      return typeof message === 'string' ? message : null;
+    } catch {
+      return text.slice(0, 500);
+    }
+  } catch {
+    return null;
+  }
+}
+
+async function runMistralBreathOcr(mimeType: 'image/png' | 'image/jpeg', imageBase64: string): Promise<{markdown: string; model: string}> {
+  if (!mistralApiKey) {
+    throw {
+      status: 502,
+      code: 'OCR_PROVIDER_ERROR',
+      message: 'MISTRAL_API_KEY is missing on the server.',
+    } as BreathOcrFailure;
+  }
+
+  const timeoutMs = Number.isFinite(breathOcrTimeoutMs) && breathOcrTimeoutMs > 1000
+    ? Math.floor(breathOcrTimeoutMs)
+    : 20000;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch('https://api.mistral.ai/v1/ocr', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + mistralApiKey,
+      },
+      body: JSON.stringify({
+        model: breathOcrModel,
+        document: {
+          type: 'image_url',
+          image_url: 'data:' + mimeType + ';base64,' + imageBase64,
+        },
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const upstreamMessage = await readErrorMessageFromResponse(response);
+
+      if (response.status === 429) {
+        throw {
+          status: 429,
+          code: 'OCR_RATE_LIMIT',
+          message: upstreamMessage || 'LLM quota exceeded. Please try again later.',
+        } as BreathOcrFailure;
+      }
+
+      if (response.status === 408 || response.status === 504) {
+        throw {
+          status: 504,
+          code: 'OCR_TIMEOUT',
+          message: 'OCR provider timed out. Please try again.',
+        } as BreathOcrFailure;
+      }
+
+      throw {
+        status: 502,
+        code: 'OCR_PROVIDER_ERROR',
+        message: upstreamMessage || 'OCR provider error (' + response.status + ').',
+      } as BreathOcrFailure;
+    }
+
+    const payload = await response.json();
+    const pages = Array.isArray(payload?.pages) ? payload.pages : [];
+
+    const markdown = pages
+      .map((page: any) => (typeof page?.markdown === 'string' ? page.markdown : ''))
+      .join('\n')
+      .trim();
+
+    if (!markdown) {
+      throw {
+        status: 502,
+        code: 'OCR_PROVIDER_ERROR',
+        message: 'OCR provider returned no readable content.',
+      } as BreathOcrFailure;
+    }
+
+    return {
+      markdown,
+      model: typeof payload?.model === 'string' ? payload.model : breathOcrModel,
+    };
+  } catch (error) {
+    if ((error as any)?.name === 'AbortError') {
+      throw {
+        status: 504,
+        code: 'OCR_TIMEOUT',
+        message: 'OCR request timed out. Please try a smaller or clearer image.',
+      } as BreathOcrFailure;
+    }
+
+    if (isBreathOcrFailure(error)) {
+      throw error;
+    }
+
+    throw {
+      status: 502,
+      code: 'OCR_PROVIDER_ERROR',
+      message: 'OCR provider unavailable. Please try again later.',
+    } as BreathOcrFailure;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function validateEmail(email: string): boolean {
   return /\S+@\S+\.\S+/.test(email);
 }
@@ -1243,6 +1661,98 @@ app.delete('/api/food-logs/:id', requireAuth, async (req: AuthenticatedRequest, 
   res.json({success: true});
 });
 
+
+app.post('/api/breath-tests/extract', requireAuth, async (req: AuthenticatedRequest, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+
+  const fileName = typeof req.body?.fileName === 'string' ? req.body.fileName.trim().slice(0, 512) : '';
+  const mimeType = normalizeBreathOcrMimeType(req.body?.mimeType);
+  const imageBase64 = normalizeBase64ImagePayload(req.body?.imageBase64);
+
+  if (!mimeType) {
+    sendBreathOcrError(res, 400, 'UNSUPPORTED_FILE_TYPE', 'Only JPG and PNG image files are supported for AI extraction.');
+    return;
+  }
+
+  if (!imageBase64) {
+    sendBreathOcrError(res, 400, 'INVALID_INPUT', 'Image payload is missing or invalid base64.');
+    return;
+  }
+
+  let imageBytes = 0;
+  try {
+    imageBytes = Buffer.from(imageBase64, 'base64').length;
+  } catch {
+    sendBreathOcrError(res, 400, 'INVALID_INPUT', 'Image payload is not valid base64.');
+    return;
+  }
+
+  if (imageBytes <= 0) {
+    sendBreathOcrError(res, 400, 'INVALID_INPUT', 'Image payload is empty.');
+    return;
+  }
+
+  const maxImageBytes = (
+    Number.isFinite(breathOcrMaxImageMb) && breathOcrMaxImageMb > 0
+      ? Math.floor(breathOcrMaxImageMb)
+      : 8
+  ) * 1024 * 1024;
+
+  if (imageBytes > maxImageBytes) {
+    sendBreathOcrError(
+      res,
+      413,
+      'FILE_TOO_LARGE',
+      'Image file is too large for OCR. Please upload a smaller image.'
+    );
+    return;
+  }
+
+  const rateKey = user.id + ':' + getClientIp(req);
+  if (!checkBreathOcrRateLimit(rateKey)) {
+    sendBreathOcrError(res, 429, 'OCR_RATE_LIMIT', 'OCR rate limit reached. Please try again later.');
+    return;
+  }
+
+  try {
+    const upstream = await runMistralBreathOcr(mimeType, imageBase64);
+    const parsed = parseBreathOcrRows(upstream.markdown);
+
+    if (parsed.rows.length < 2) {
+      sendBreathOcrError(
+        res,
+        422,
+        'OCR_PROVIDER_ERROR',
+        'Could not reliably extract minute, H2, and CH4 rows from this image.'
+      );
+      return;
+    }
+
+    const detectedInterval = detectBreathOcrInterval(parsed.rows);
+
+    res.json({
+      success: true,
+      data: {
+        rows: parsed.rows,
+        detectedInterval,
+        warnings: parsed.warnings,
+        model: upstream.model,
+        provider: 'mistral',
+        ...(fileName ? {fileName} : {}),
+      },
+    });
+  } catch (error) {
+    if (isBreathOcrFailure(error)) {
+      sendBreathOcrError(res, error.status, error.code, error.message);
+      return;
+    }
+
+    console.error('[BREATH_OCR_ERROR]', error);
+    sendBreathOcrError(res, 502, 'OCR_PROVIDER_ERROR', 'OCR provider unavailable. Please try again later.');
+  }
+});
+
 app.get('/api/breath-tests', requireAuth, async (req: AuthenticatedRequest, res) => {
   const user = requireUser(req, res);
   if (!user) return;
@@ -1408,3 +1918,9 @@ startServer().catch((error) => {
 
 
  
+
+
+
+
+
+

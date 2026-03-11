@@ -1,32 +1,73 @@
-import React, { useEffect, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
-import { BreathDataPoint, BreathTest } from '../../types/breathTest';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Plus, Trash2, AlertCircle } from 'lucide-react';
+import { BreathDataPoint, BreathDataPointDraft, BreathTest } from '../../types/breathTest';
 import { useLanguage } from '../../context/LanguageContext';
 
 interface ManualEntryTableProps {
-  initialData?: BreathDataPoint[] | null;
+  initialData?: BreathDataPointDraft[] | null;
+  minuteStep?: 15 | 20 | null;
+  extractionWarnings?: string[];
   onSave: (test: Omit<BreathTest, 'id' | 'createdAt'>) => Promise<void>;
   onCancel: () => void;
 }
 
-export default function ManualEntryTable({ initialData, onSave, onCancel }: ManualEntryTableProps) {
+const DEFAULT_ROWS: BreathDataPointDraft[] = [
+  { minute: 0, h2: 0, ch4: 0 },
+  { minute: 15, h2: 0, ch4: 0 },
+  { minute: 30, h2: 0, ch4: 0 },
+];
+
+const sanitizeNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return parsed;
+};
+
+const toDraftRow = (row: BreathDataPointDraft): BreathDataPointDraft => ({
+  minute: sanitizeNumber(row.minute),
+  h2: sanitizeNumber(row.h2),
+  ch4: sanitizeNumber(row.ch4),
+});
+
+const parseInputNumber = (value: string): number | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return parsed;
+};
+
+const isCompleteRow = (row: BreathDataPointDraft): row is BreathDataPoint => {
+  return (
+    typeof row.minute === 'number' && Number.isFinite(row.minute) && row.minute >= 0 &&
+    typeof row.h2 === 'number' && Number.isFinite(row.h2) && row.h2 >= 0 &&
+    typeof row.ch4 === 'number' && Number.isFinite(row.ch4) && row.ch4 >= 0
+  );
+};
+
+export default function ManualEntryTable({
+  initialData,
+  minuteStep,
+  extractionWarnings,
+  onSave,
+  onCancel,
+}: ManualEntryTableProps) {
   const { isHr } = useLanguage();
   const [substrate, setSubstrate] = useState<'glucose' | 'lactulose' | 'unknown'>('lactulose');
   const [notes, setNotes] = useState('');
   const [testDate, setTestDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [dataPoints, setDataPoints] = useState<BreathDataPoint[]>([
-    { minute: 0, h2: 0, ch4: 0 },
-    { minute: 15, h2: 0, ch4: 0 },
-    { minute: 30, h2: 0, ch4: 0 },
-  ]);
+  const [dataPoints, setDataPoints] = useState<BreathDataPointDraft[]>(DEFAULT_ROWS);
   const [isSaving, setIsSaving] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
   useEffect(() => {
     if (initialData && initialData.length > 0) {
-      setDataPoints(initialData);
+      setDataPoints(initialData.map(toDraftRow));
     }
   }, [initialData]);
+
+  const effectiveStep = useMemo(() => (minuteStep === 20 ? 20 : 15), [minuteStep]);
 
   const copy = {
     substrate: isHr ? 'Supstrat' : 'Substrate',
@@ -42,12 +83,23 @@ export default function ManualEntryTable({ initialData, onSave, onCancel }: Manu
     saveTest: isHr ? 'Spremi test' : 'Save Test',
     saving: isHr ? 'Spremanje...' : 'Saving...',
     saveError: isHr ? 'Spremanje testa nije uspjelo.' : 'Could not save breath test.',
+    completeRows: isHr
+      ? 'Molimo upisi minute, H2 i CH4 vrijednosti u svaki red prije spremanja.'
+      : 'Please fill minute, H2, and CH4 in every row before saving.',
+    extractionWarningsTitle: isHr ? 'AI upozorenja' : 'AI warnings',
+    stepDetected: isHr
+      ? `Detektirani razmak mjerenja: svakih ${effectiveStep} min.`
+      : `Detected measurement interval: every ${effectiveStep} min.`,
   };
 
   const handleAddRow = () => {
     if (isSaving) return;
-    const lastMinute = dataPoints.length > 0 ? dataPoints[dataPoints.length - 1].minute : 0;
-    setDataPoints([...dataPoints, { minute: lastMinute + 15, h2: 0, ch4: 0 }]);
+    const lastMinute =
+      dataPoints.length > 0 && typeof dataPoints[dataPoints.length - 1]?.minute === 'number'
+        ? (dataPoints[dataPoints.length - 1].minute as number)
+        : 0;
+
+    setDataPoints([...dataPoints, { minute: lastMinute + effectiveStep, h2: null, ch4: null }]);
   };
 
   const handleRemoveRow = (index: number) => {
@@ -55,11 +107,11 @@ export default function ManualEntryTable({ initialData, onSave, onCancel }: Manu
     setDataPoints(dataPoints.filter((_, i) => i !== index));
   };
 
-  const handleChange = (index: number, field: keyof BreathDataPoint, value: string) => {
+  const handleChange = (index: number, field: keyof BreathDataPointDraft, value: string) => {
     if (isSaving) return;
-    const numValue = value === '' ? 0 : parseInt(value, 10);
+    const numericValue = parseInputNumber(value);
     const newData = [...dataPoints];
-    newData[index] = { ...newData[index], [field]: isNaN(numValue) ? 0 : numValue };
+    newData[index] = { ...newData[index], [field]: numericValue };
     setDataPoints(newData);
   };
 
@@ -67,7 +119,20 @@ export default function ManualEntryTable({ initialData, onSave, onCancel }: Manu
     e.preventDefault();
     if (isSaving) return;
 
-    const sortedData = [...dataPoints].sort((a, b) => a.minute - b.minute);
+    const completeRows = dataPoints
+      .map(toDraftRow)
+      .filter(isCompleteRow)
+      .map((row) => ({
+        minute: Math.round(row.minute),
+        h2: Math.round(row.h2),
+        ch4: Math.round(row.ch4),
+      }))
+      .sort((a, b) => a.minute - b.minute);
+
+    if (completeRows.length !== dataPoints.length || completeRows.length === 0) {
+      setSubmitError(copy.completeRows);
+      return;
+    }
 
     setSubmitError('');
     setIsSaving(true);
@@ -75,7 +140,7 @@ export default function ManualEntryTable({ initialData, onSave, onCancel }: Manu
       await onSave({
         substrate,
         units: 'ppm',
-        data: sortedData,
+        data: completeRows,
         notes,
         testDate: testDate || undefined,
       });
@@ -126,6 +191,26 @@ export default function ManualEntryTable({ initialData, onSave, onCancel }: Manu
         </div>
       </div>
 
+      {(extractionWarnings && extractionWarnings.length > 0) && (
+        <div className="mb-4 text-sm text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
+          <div className="flex items-center gap-2 font-medium mb-2">
+            <AlertCircle className="w-4 h-4" />
+            {copy.extractionWarningsTitle}
+          </div>
+          <ul className="list-disc pl-5 space-y-1">
+            {extractionWarnings.map((warning, index) => (
+              <li key={`${warning}-${index}`}>{warning}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {minuteStep && (
+        <div className="mb-4 text-xs text-blue-300 bg-blue-500/10 border border-blue-500/30 rounded-xl p-2">
+          {copy.stepDetected}
+        </div>
+      )}
+
       {submitError && (
         <div className="mb-4 text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
           {submitError}
@@ -149,33 +234,30 @@ export default function ManualEntryTable({ initialData, onSave, onCancel }: Manu
                   <input
                     type="number"
                     min="0"
-                    value={point.minute}
+                    value={point.minute ?? ''}
                     onChange={(e) => handleChange(index, 'minute', e.target.value)}
                     disabled={isSaving}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono text-sm focus:outline-none focus:border-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                    required
                   />
                 </td>
                 <td className="p-2">
                   <input
                     type="number"
                     min="0"
-                    value={point.h2}
+                    value={point.h2 ?? ''}
                     onChange={(e) => handleChange(index, 'h2', e.target.value)}
                     disabled={isSaving}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono text-sm focus:outline-none focus:border-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                    required
                   />
                 </td>
                 <td className="p-2">
                   <input
                     type="number"
                     min="0"
-                    value={point.ch4}
+                    value={point.ch4 ?? ''}
                     onChange={(e) => handleChange(index, 'ch4', e.target.value)}
                     disabled={isSaving}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono text-sm focus:outline-none focus:border-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                    required
                   />
                 </td>
                 <td className="p-2 text-center">

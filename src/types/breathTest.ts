@@ -5,6 +5,13 @@ export interface BreathDataPoint {
   h2s?: number;
 }
 
+export interface BreathDataPointDraft {
+  minute: number | null;
+  h2: number | null;
+  ch4: number | null;
+  h2s?: number | null;
+}
+
 export interface BreathTest {
   id: string;
   createdAt: string;
@@ -15,3 +22,4 @@ export interface BreathTest {
   notes?: string;
   fileName?: string;
 }
+

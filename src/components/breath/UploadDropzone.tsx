@@ -76,7 +76,7 @@ export default function UploadDropzone({ onUpload }: UploadDropzoneProps) {
         type="file"
         id="file-upload"
         className="hidden"
-        accept=".png,.jpg,.jpeg,.webp,.pdf,.csv"
+        accept=".png,.jpg,.jpeg,.pdf,.csv"
         onChange={handleChange}
       />
       <label 
@@ -88,3 +88,4 @@ export default function UploadDropzone({ onUpload }: UploadDropzoneProps) {
     </div>
   );
 }
+

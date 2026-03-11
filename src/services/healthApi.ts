@@ -33,6 +33,22 @@ export type NihChatResponse = {
   model: string;
 };
 
+export type BreathOcrRow = {
+  minute: number;
+  h2: number | null;
+  ch4: number | null;
+  confidence?: number;
+};
+
+export type BreathImageExtractResponse = {
+  rows: BreathOcrRow[];
+  detectedInterval: 15 | 20 | null;
+  warnings: string[];
+  model: string;
+  provider: string;
+  fileName?: string;
+};
+
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim().replace(/\/$/, '') || '';
 
 function apiUrl(path: string) {
@@ -245,9 +261,21 @@ export function deleteBreathTest(id: string) {
   });
 }
 
+export function extractBreathTestFromImage(payload: {
+  fileName: string;
+  mimeType: 'image/png' | 'image/jpeg';
+  imageBase64: string;
+}) {
+  return request<BreathImageExtractResponse>('/api/breath-tests/extract', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
 export function askNihBot(question: string, language: 'en' | 'hr') {
   return request<NihChatResponse>('/api/nih/chat', {
     method: 'POST',
     body: JSON.stringify({ question, language }),
   });
 }
+
+
