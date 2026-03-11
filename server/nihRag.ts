@@ -33,7 +33,7 @@ export type GenerateNihAnswerOptions = {
 
 type NihLlmProvider = 'gemini' | 'groq';
 
-const defaultTopK = Number(process.env.NIH_TOP_K ?? 6);
+const defaultTopK = Number(process.env.NIH_TOP_K ?? 10);
 const cacheDir = path.resolve(process.cwd(), 'src', 'nih_kb', 'cache');
 
 let cachedChunks: ChunkRecord[] = [];
@@ -47,6 +47,17 @@ const providerRaw = (process.env.NIH_LLM_PROVIDER ?? '').trim().toLowerCase();
 const llmProvider: NihLlmProvider = providerRaw === 'groq' ? 'groq' : 'gemini';
 
 const geminiClient = geminiApiKey ? new GoogleGenAI({apiKey: geminiApiKey}) : null;
+const runtimeChunkWords = Number(process.env.NIH_RUNTIME_CHUNK_WORDS ?? 240);
+const runtimeChunkOverlapWords = Number(process.env.NIH_RUNTIME_CHUNK_OVERLAP_WORDS ?? 60);
+
+const STOP_WORDS = new Set([
+  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'how', 'in', 'is', 'it',
+  'of', 'on', 'or', 'that', 'the', 'this', 'to', 'what', 'when', 'where', 'which', 'who',
+  'why', 'with', 'main', 'about', 'does', 'your',
+  'can', 'could', 'would', 'should', 'there', 'their', 'them', 'they', 'you', 'please',
+  'tell', 'say', 'says', 'mean', 'means', 'into', 'have', 'has', 'had', 'more', 'less',
+  'than', 'then', 'also', 'just', 'like', 'uh', 'um', 'hmm', 'okay', 'ok',
+]);
 
 function normalizeText(value: string): string {
   return value
@@ -56,11 +67,77 @@ function normalizeText(value: string): string {
     .trim();
 }
 
+function isNihEvidenceUrl(value: string): boolean {
+  const raw = String(value ?? '').trim();
+  if (!raw) return false;
+
+  try {
+    const parsed = new URL(raw);
+    const host = parsed.hostname.toLowerCase();
+    return host === 'nih.gov' || host.endsWith('.nih.gov');
+  } catch {
+    return false;
+  }
+}
+
 function tokenize(value: string): string[] {
-  const terms = normalizeText(value).split(' ').filter((token) => token.length > 2);
+  const terms = normalizeText(value)
+    .split(' ')
+    .filter((token) => token.length > 2 && !STOP_WORDS.has(token));
   const uniqueTerms = new Set<string>();
   for (const term of terms) uniqueTerms.add(term);
   return [...uniqueTerms];
+}
+
+function sanitizeKnowledgeText(value: string): string {
+  return value
+    .replace(/\s*>>\s*/g, ' ')
+    .replace(/\b(uh|um)\b/gi, ' ')
+    .replace(/\b(you know|kind of|sort of)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function rechunkDocument(chunks: string[], maxWords = runtimeChunkWords, overlapWords = runtimeChunkOverlapWords): string[] {
+  const safeMaxWords = Number.isFinite(maxWords) && maxWords >= 80 ? Math.floor(maxWords) : 240;
+  const safeOverlap = Number.isFinite(overlapWords) && overlapWords >= 0
+    ? Math.min(Math.floor(overlapWords), safeMaxWords - 20)
+    : 60;
+  const step = Math.max(20, safeMaxWords - safeOverlap);
+
+  const rawText = chunks
+    .map((chunk) => sanitizeKnowledgeText(String(chunk ?? '')))
+    .filter(Boolean)
+    .join(' ');
+  const words = rawText.split(/\s+/).filter(Boolean);
+
+  if (words.length === 0) return [];
+  if (words.length <= safeMaxWords) return [words.join(' ')];
+
+  const result: string[] = [];
+  for (let start = 0; start < words.length; start += step) {
+    const slice = words.slice(start, start + safeMaxWords);
+    if (slice.length === 0) break;
+    result.push(slice.join(' '));
+    if (start + safeMaxWords >= words.length) break;
+  }
+
+  return result;
+}
+
+function expandDomainTerms(baseTerms: string[]): string[] {
+  const expanded = new Set(baseTerms);
+  const hasSibo = expanded.has('sibo');
+  const asksForTypes = expanded.has('type') || expanded.has('types');
+  const asksForThree = expanded.has('three') || expanded.has('3');
+
+  if (hasSibo && (asksForTypes || asksForThree)) {
+    for (const term of ['hydrogen', 'methane', 'sulfide', 'h2s', 'imo', 'emo', 'gas']) {
+      expanded.add(term);
+    }
+  }
+
+  return [...expanded];
 }
 
 function toSnippet(content: string, queryTerms: string[]): string {
@@ -91,14 +168,21 @@ function loadCacheDocs(): ChunkRecord[] {
       const raw = readFileSync(fullPath, 'utf-8').replace(/^\uFEFF/, '');
       const doc = JSON.parse(raw) as CachedDoc;
       if (!doc || !Array.isArray(doc.chunks)) continue;
+      const sourceUrl = String(doc.url ?? '').trim();
+      if (!isNihEvidenceUrl(sourceUrl)) {
+        console.warn(`[NIH_CACHE_SKIP_NON_NIH] ${fileName}: ${sourceUrl || 'missing-url'}`);
+        continue;
+      }
+      const rechunked = rechunkDocument(doc.chunks);
+      if (rechunked.length === 0) continue;
 
-      doc.chunks.forEach((chunk, chunkIndex) => {
-        const content = String(chunk ?? '').replace(/\s+/g, ' ').trim();
+      rechunked.forEach((chunk, chunkIndex) => {
+        const content = sanitizeKnowledgeText(String(chunk ?? ''));
         if (!content) return;
         rows.push({
           id: `${fileName}::${chunkIndex}`,
           title: String(doc.title ?? doc.url ?? 'NIH source'),
-          url: String(doc.url ?? ''),
+          url: sourceUrl,
           content,
         });
       });
@@ -129,26 +213,41 @@ function ensureIndex() {
   });
 }
 
-function keywordScore(chunk: ChunkRecord, queryTerms: string[]) {
-  if (queryTerms.length === 0) return 0;
+function keywordStats(chunk: ChunkRecord, queryTerms: string[]) {
+  if (queryTerms.length === 0) return {score: 0, matchedTerms: 0};
   const text = normalizeText(`${chunk.title} ${chunk.content}`);
+  const title = normalizeText(chunk.title);
   let score = 0;
+  let matchedTerms = 0;
   for (const term of queryTerms) {
     if (!text.includes(term)) continue;
+    matchedTerms += 1;
     score += 1;
-    if (normalizeText(chunk.title).includes(term)) score += 1.5;
+    if (title.includes(term)) score += 1.5;
   }
-  return score;
+  return {score, matchedTerms};
+}
+
+function combinedScore(item: {lunrScore: number; keyword: number; matchedTerms: number}) {
+  return (item.lunrScore * 2.2) + item.keyword + (item.matchedTerms * 0.9);
+}
+
+function countContainedTerms(text: string, terms: string[]): number {
+  let count = 0;
+  for (const term of terms) {
+    if (text.includes(term)) count += 1;
+  }
+  return count;
 }
 
 export function retrieveNihCitations(question: string, topK = defaultTopK): NihCitation[] {
   ensureIndex();
   if (!index || cachedChunks.length === 0) return [];
 
-  const queryTerms = tokenize(question);
+  const queryTerms = expandDomainTerms(tokenize(question));
   if (queryTerms.length === 0) return [];
 
-  const scored = new Map<string, {chunk: ChunkRecord; lunrScore: number; keyword: number}>();
+  const scored = new Map<string, {chunk: ChunkRecord; lunrScore: number; keyword: number; matchedTerms: number}>();
 
   try {
     const lunrQuery = queryTerms.map((term) => `${term}*`).join(' ');
@@ -156,10 +255,12 @@ export function retrieveNihCitations(question: string, topK = defaultTopK): NihC
     for (const hit of lunrHits) {
       const chunk = cachedChunks.find((item) => item.id === hit.ref);
       if (!chunk) continue;
+      const stats = keywordStats(chunk, queryTerms);
       scored.set(chunk.id, {
         chunk,
         lunrScore: hit.score,
-        keyword: keywordScore(chunk, queryTerms),
+        keyword: stats.score,
+        matchedTerms: stats.matchedTerms,
       });
     }
   } catch {
@@ -168,13 +269,38 @@ export function retrieveNihCitations(question: string, topK = defaultTopK): NihC
 
   for (const chunk of cachedChunks) {
     if (scored.has(chunk.id)) continue;
-    const key = keywordScore(chunk, queryTerms);
-    if (key <= 0) continue;
-    scored.set(chunk.id, {chunk, lunrScore: 0, keyword: key});
+    const stats = keywordStats(chunk, queryTerms);
+    if (stats.score <= 0) continue;
+    scored.set(chunk.id, {
+      chunk,
+      lunrScore: 0,
+      keyword: stats.score,
+      matchedTerms: stats.matchedTerms,
+    });
   }
 
-  const ranked = [...scored.values()]
-    .sort((a, b) => (b.lunrScore + b.keyword) - (a.lunrScore + a.keyword))
+  const asksForSiboTypes = queryTerms.includes('sibo') && (
+    queryTerms.includes('type') ||
+    queryTerms.includes('types') ||
+    queryTerms.includes('three') ||
+    queryTerms.includes('3')
+  );
+
+  const rankedCandidates = [...scored.values()];
+  const gasFocusedCandidates = asksForSiboTypes
+    ? rankedCandidates.filter((item) => {
+        const text = normalizeText(`${item.chunk.title} ${item.chunk.content}`);
+        return countContainedTerms(text, ['hydrogen', 'methane', 'sulfide']) >= 2;
+      })
+    : [];
+
+  const basePool = gasFocusedCandidates.length > 0 ? gasFocusedCandidates : rankedCandidates;
+  const minMatches = queryTerms.length >= 6 ? 2 : 1;
+  const filteredByCoverage = basePool.filter((item) => item.matchedTerms >= minMatches);
+  const pool = filteredByCoverage.length > 0 ? filteredByCoverage : basePool;
+
+  const ranked = pool
+    .sort((a, b) => combinedScore(b) - combinedScore(a))
     .slice(0, Math.max(1, topK));
 
   return ranked.map((item, indexInList) => ({
@@ -205,7 +331,7 @@ function buildPrompt(
     ? [
         `Allowed citation tokens: ${allowedCitationTokens}.`,
         'You MUST include at least one allowed citation token exactly as written (example: [C1]).',
-        'If context is insufficient, say so and still cite the closest available context token.',
+        'If context is insufficient, say so explicitly and do not invent missing facts.',
       ]
     : [
         `Allowed citation tokens: ${allowedCitationTokens}.`,
@@ -217,6 +343,8 @@ function buildPrompt(
     'Use ONLY the provided NIH context.',
     'Do not use external knowledge.',
     'If context is insufficient, say so explicitly.',
+    'For "types of SIBO" questions, explicitly check for hydrogen, methane (IMO/EMO), and hydrogen sulfide mentions before concluding anything is missing.',
+    'If the question asks for a count (e.g., "three types"), return that exact count when supported by context and map methane-predominant overgrowth to IMO/EMO terminology.',
     ...citationFormatInstructions,
     languageInstruction,
     '',

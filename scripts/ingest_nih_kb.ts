@@ -22,12 +22,36 @@ interface CachedDoc {
   chunks: string[];
 }
 
-const chunkText = (text: string, maxWords = 150): string[] => {
-  const words = text.split(/\s+/);
-  const chunks = [];
-  for (let i = 0; i < words.length; i += maxWords) {
-    chunks.push(words.slice(i, i + maxWords).join(' '));
+const chunkWords = Number(process.env.NIH_CHUNK_WORDS ?? 240);
+const chunkOverlapWords = Number(process.env.NIH_CHUNK_OVERLAP_WORDS ?? 60);
+
+const sanitizeExtractedText = (text: string): string =>
+  text
+    .replace(/\s*>>\s*/g, ' ')
+    .replace(/\b(uh|um)\b/gi, ' ')
+    .replace(/\b(you know|kind of|sort of)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const chunkText = (text: string, maxWords = chunkWords, overlapWords = chunkOverlapWords): string[] => {
+  const safeMaxWords = Number.isFinite(maxWords) && maxWords >= 80 ? Math.floor(maxWords) : 240;
+  const safeOverlap = Number.isFinite(overlapWords) && overlapWords >= 0
+    ? Math.min(Math.floor(overlapWords), safeMaxWords - 20)
+    : 60;
+  const step = Math.max(20, safeMaxWords - safeOverlap);
+
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [];
+  if (words.length <= safeMaxWords) return [words.join(' ')];
+
+  const chunks: string[] = [];
+  for (let i = 0; i < words.length; i += step) {
+    const slice = words.slice(i, i + safeMaxWords);
+    if (slice.length === 0) break;
+    chunks.push(slice.join(' '));
+    if (i + safeMaxWords >= words.length) break;
   }
+
   return chunks;
 };
 
@@ -79,7 +103,7 @@ const ingest = async () => {
         $('article').text() ||
         $('[role="main"]').text() ||
         $('body').text();
-      const text = extracted.replace(/\s+/g, ' ').trim();
+      const text = sanitizeExtractedText(extracted);
 
       if (!text || text.length < 500 || looksLikeNotFoundPage(text)) {
         if (fs.existsSync(outputPath)) {

@@ -53,7 +53,7 @@ const sessionCookieName = 'sibolytics_session';
 const sessionDurationDays = 7;
 const isProduction = process.env.NODE_ENV === 'production';
 const clientDistPath = path.resolve(process.cwd(), 'dist');
-const nihMaxContextChars = Number(process.env.NIH_MAX_CONTEXT_CHARS ?? 12000);
+const nihMaxContextChars = Number(process.env.NIH_MAX_CONTEXT_CHARS ?? 18000);
 const nihMaxQpsPerUser = Number(process.env.NIH_MAX_QPS_PER_USER ?? 1);
 const nihMaxReqPerHour = Number(process.env.NIH_MAX_REQ_PER_HOUR ?? 30);
 const nihRateWindowMs = 60 * 60 * 1000;
