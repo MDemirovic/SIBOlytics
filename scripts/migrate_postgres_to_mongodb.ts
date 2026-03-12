@@ -76,6 +76,22 @@ function normalizePointsJson(value: unknown): JsonMap {
   return normalized;
 }
 
+function normalizeDateKey(value: unknown): string {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+    throw new Error(`Invalid date string: ${trimmed}`);
+  }
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  throw new Error(`Invalid date value: ${String(value)}`);
+}
+
 async function main() {
   const legacyDatabaseUrl = mustEnv(
     'LEGACY_DATABASE_URL (or DATABASE_URL)',
@@ -197,7 +213,7 @@ async function main() {
     if (await tableExists(client, 'symptom_entries')) {
       const symptoms = await client.query(
         `
-        SELECT id, user_id, entry_date, pain, stress, sleep, stool, bloating, diarrhea, energy, overall_gut, notes, created_at, updated_at
+        SELECT id, user_id, entry_date::text AS entry_date, pain, stress, sleep, stool, bloating, diarrhea, energy, overall_gut, notes, created_at, updated_at
         FROM symptom_entries
         `
       );
@@ -210,7 +226,7 @@ async function main() {
               replacement: {
                 id: String(row.id),
                 userId: String(row.user_id),
-                entryDate: String(row.entry_date).slice(0, 10),
+                entryDate: normalizeDateKey(row.entry_date),
                 pain: Number(row.pain),
                 stress: Number(row.stress),
                 sleep: Number(row.sleep),
@@ -264,7 +280,7 @@ async function main() {
     if (await tableExists(client, 'breath_test_runs')) {
       const breathTests = await client.query(
         `
-        SELECT id, user_id, test_date, substrate, units, notes, file_name, points_json, created_at
+        SELECT id, user_id, test_date::text AS test_date, substrate, units, notes, file_name, points_json, created_at
         FROM breath_test_runs
         `
       );
@@ -279,7 +295,7 @@ async function main() {
                 replacement: {
                   id: String(row.id),
                   userId: String(row.user_id),
-                  testDate: row.test_date ? String(row.test_date).slice(0, 10) : undefined,
+                  testDate: row.test_date ? normalizeDateKey(row.test_date) : undefined,
                   substrate: String(row.substrate ?? 'unknown'),
                   units: String(row.units ?? 'ppm'),
                   notes: String(row.notes ?? ''),
