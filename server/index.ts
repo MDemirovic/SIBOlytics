@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import {existsSync} from 'node:fs';
 import path from 'node:path';
 import express, {NextFunction, Request, Response} from 'express';
-import {Pool, PoolClient} from 'pg';
+import {Collection, MongoClient, MongoServerError} from 'mongodb';
 import {
   extractValidCitationIds,
   generateNihAnswer,
@@ -44,9 +44,75 @@ type BreathPointInput = {
   h2s?: number;
 };
 
+type UserDocument = {
+  id: string;
+  email: string;
+  name: string;
+  passwordHash: string;
+  hasCompletedOnboarding: boolean;
+  emailVerified: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type SessionDocument = {
+  tokenHash: string;
+  userId: string;
+  expiresAt: Date;
+  createdAt: Date;
+};
+
+type OnboardingProfileDocument = {
+  userId: string;
+  data: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type SymptomEntryDocument = {
+  id: string;
+  userId: string;
+  entryDate: string;
+  pain: number;
+  stress: number;
+  sleep: number;
+  stool: number;
+  bloating: number;
+  diarrhea: number;
+  energy: number;
+  overallGut: number;
+  notes: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type FoodLogEntryDocument = {
+  id: string;
+  userId: string;
+  name: string;
+  amount: string;
+  status: FoodStatus;
+  notes: string;
+  createdAt: Date;
+};
+
+type BreathTestRunDocument = {
+  id: string;
+  userId: string;
+  testDate?: string;
+  substrate: BreathSubstrate;
+  units: BreathUnits;
+  notes: string;
+  fileName: string;
+  pointsJson: Record<string, {h2: number; ch4: number; h2s?: number}>;
+  pointsJsonCanonical: string;
+  createdAt: Date;
+};
+
 const app = express();
 const port = Number(process.env.API_PORT ?? process.env.PORT ?? 3001);
-const databaseUrl = process.env.DATABASE_URL;
+const mongoUri = process.env.MONGODB_URI?.trim();
+const mongoDbName = process.env.MONGODB_DB_NAME?.trim() || 'sibolytics';
 const sessionCookieName = 'sibolytics_session';
 const sessionDurationDays = 7;
 const isProduction = process.env.NODE_ENV === 'production';
@@ -73,296 +139,43 @@ type NihRateState = {
 
 const nihRateMap = new Map<string, NihRateState>();
 
-if (!databaseUrl) {
-  throw new Error('Missing DATABASE_URL in environment variables.');
+if (!mongoUri) {
+  throw new Error('Missing MONGODB_URI in environment variables.');
 }
 
-const pool = new Pool({
-  connectionString: databaseUrl,
-});
+const mongoClient = new MongoClient(mongoUri);
+let usersCollection!: Collection<UserDocument>;
+let sessionsCollection!: Collection<SessionDocument>;
+let onboardingProfilesCollection!: Collection<OnboardingProfileDocument>;
+let symptomEntriesCollection!: Collection<SymptomEntryDocument>;
+let foodLogEntriesCollection!: Collection<FoodLogEntryDocument>;
+let breathTestRunsCollection!: Collection<BreathTestRunDocument>;
 
-const initSql = `
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+async function connectMongo() {
+  await mongoClient.connect();
+  const db = mongoClient.db(mongoDbName);
 
-CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email TEXT UNIQUE NOT NULL,
-  name TEXT NOT NULL,
-  password_hash TEXT NOT NULL,
-  has_completed_onboarding BOOLEAN NOT NULL DEFAULT FALSE,
-  email_verified BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS onboarding_profiles (
-  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  data JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS sessions (
-  token_hash TEXT PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  expires_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS symptom_entries (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  entry_date DATE NOT NULL,
-  pain SMALLINT NOT NULL,
-  stress SMALLINT NOT NULL,
-  sleep SMALLINT NOT NULL,
-  stool SMALLINT NOT NULL,
-  bloating SMALLINT NOT NULL,
-  diarrhea SMALLINT NOT NULL,
-  energy SMALLINT NOT NULL,
-  overall_gut SMALLINT NOT NULL,
-  notes TEXT NOT NULL DEFAULT '',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (user_id, entry_date)
-);
-
-CREATE TABLE IF NOT EXISTS food_log_entries (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  amount TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('safe', 'caution', 'trigger')),
-  notes TEXT NOT NULL DEFAULT '',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-
-CREATE INDEX IF NOT EXISTS idx_symptom_entries_user_date
-ON symptom_entries (user_id, entry_date DESC);
-
-CREATE INDEX IF NOT EXISTS idx_food_log_entries_user_created
-ON food_log_entries (user_id, created_at DESC);
-
-`;
-
-async function tableExists(client: PoolClient, tableName: string): Promise<boolean> {
-  const result = await client.query(
-    `
-    SELECT EXISTS (
-      SELECT 1
-      FROM information_schema.tables
-      WHERE table_schema = 'public' AND table_name = $1
-    ) AS exists
-    `,
-    [tableName]
-  );
-  return Boolean(result.rows[0]?.exists);
+  usersCollection = db.collection<UserDocument>('users');
+  sessionsCollection = db.collection<SessionDocument>('sessions');
+  onboardingProfilesCollection = db.collection<OnboardingProfileDocument>('onboarding_profiles');
+  symptomEntriesCollection = db.collection<SymptomEntryDocument>('symptom_entries');
+  foodLogEntriesCollection = db.collection<FoodLogEntryDocument>('food_log_entries');
+  breathTestRunsCollection = db.collection<BreathTestRunDocument>('breath_test_runs');
 }
 
-async function columnExists(client: PoolClient, tableName: string, columnName: string): Promise<boolean> {
-  const result = await client.query(
-    `
-    SELECT EXISTS (
-      SELECT 1
-      FROM information_schema.columns
-      WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
-    ) AS exists
-    `,
-    [tableName, columnName]
-  );
-  return Boolean(result.rows[0]?.exists);
+async function ensureMongoIndexes() {
+  await usersCollection.createIndex({email: 1}, {unique: true, name: 'uq_users_email'});
+  await sessionsCollection.createIndex({tokenHash: 1}, {unique: true, name: 'uq_sessions_token_hash'});
+  await sessionsCollection.createIndex({expiresAt: 1}, {expireAfterSeconds: 0, name: 'idx_sessions_expires_ttl'});
+  await onboardingProfilesCollection.createIndex({userId: 1}, {unique: true, name: 'uq_onboarding_user'});
+  await symptomEntriesCollection.createIndex({userId: 1, entryDate: -1, updatedAt: -1}, {name: 'idx_symptom_entries_user_date'});
+  await symptomEntriesCollection.createIndex({userId: 1, entryDate: 1}, {unique: true, name: 'uq_symptom_entries_user_date'});
+  await foodLogEntriesCollection.createIndex({userId: 1, createdAt: -1}, {name: 'idx_food_log_entries_user_created'});
+  await breathTestRunsCollection.createIndex({userId: 1, testDate: -1, createdAt: -1}, {name: 'idx_breath_test_runs_user_date_created'});
 }
 
-async function constraintExists(client: PoolClient, tableName: string, constraintName: string): Promise<boolean> {
-  const result = await client.query(
-    `
-    SELECT EXISTS (
-      SELECT 1
-      FROM information_schema.table_constraints
-      WHERE table_schema = 'public' AND table_name = $1 AND constraint_name = $2
-    ) AS exists
-    `,
-    [tableName, constraintName]
-  );
-  return Boolean(result.rows[0]?.exists);
-}
-
-async function indexExists(client: PoolClient, indexName: string): Promise<boolean> {
-  const result = await client.query('SELECT to_regclass($1) AS regclass', [`public.${indexName}`]);
-  return Boolean(result.rows[0]?.regclass);
-}
-
-async function runBreathTestSingleTableMigration() {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
-    const hasLegacyBreathTests = await tableExists(client, 'breath_tests');
-    const hasBreathTestRuns = await tableExists(client, 'breath_test_runs');
-
-    if (hasLegacyBreathTests && !hasBreathTestRuns) {
-      await client.query('ALTER TABLE breath_tests RENAME TO breath_test_runs');
-    }
-
-    if (!(await tableExists(client, 'breath_test_runs'))) {
-      await client.query(`
-        CREATE TABLE breath_test_runs (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          test_date DATE,
-          substrate TEXT NOT NULL CHECK (substrate IN ('glucose', 'lactulose', 'unknown')),
-          units TEXT NOT NULL CHECK (units IN ('ppm')),
-          notes TEXT NOT NULL DEFAULT '',
-          file_name TEXT NOT NULL DEFAULT '',
-          points_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-      `);
-    }
-
-    if (!(await columnExists(client, 'breath_test_runs', 'user_id'))) {
-      await client.query('ALTER TABLE breath_test_runs ADD COLUMN user_id UUID');
-    }
-
-    if (!(await columnExists(client, 'breath_test_runs', 'test_date'))) {
-      await client.query('ALTER TABLE breath_test_runs ADD COLUMN test_date DATE');
-    }
-
-    if (!(await columnExists(client, 'breath_test_runs', 'substrate'))) {
-      await client.query('ALTER TABLE breath_test_runs ADD COLUMN substrate TEXT');
-    }
-
-    if (!(await columnExists(client, 'breath_test_runs', 'units'))) {
-      await client.query(`ALTER TABLE breath_test_runs ADD COLUMN units TEXT NOT NULL DEFAULT 'ppm'`);
-    }
-
-    if (!(await columnExists(client, 'breath_test_runs', 'notes'))) {
-      await client.query(`ALTER TABLE breath_test_runs ADD COLUMN notes TEXT NOT NULL DEFAULT ''`);
-    }
-
-    if (!(await columnExists(client, 'breath_test_runs', 'file_name'))) {
-      await client.query(`ALTER TABLE breath_test_runs ADD COLUMN file_name TEXT NOT NULL DEFAULT ''`);
-    }
-
-    if (!(await columnExists(client, 'breath_test_runs', 'points_json'))) {
-      await client.query('ALTER TABLE breath_test_runs ADD COLUMN points_json JSONB');
-    }
-
-    if (!(await columnExists(client, 'breath_test_runs', 'created_at'))) {
-      await client.query(`ALTER TABLE breath_test_runs ADD COLUMN created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
-    }
-
-    if (
-      (await columnExists(client, 'breath_test_runs', 'breath_test_type_id')) &&
-      (await tableExists(client, 'breath_test_types'))
-    ) {
-      await client.query(`
-        UPDATE breath_test_runs run
-        SET substrate = type.code
-        FROM breath_test_types type
-        WHERE run.substrate IS NULL
-          AND run.breath_test_type_id = type.id
-      `);
-    }
-
-    await client.query(`
-      UPDATE breath_test_runs
-      SET substrate = 'unknown'
-      WHERE substrate IS NULL OR substrate NOT IN ('glucose', 'lactulose', 'unknown')
-    `);
-
-    await client.query('ALTER TABLE breath_test_runs ALTER COLUMN substrate SET NOT NULL');
-
-    if (!(await constraintExists(client, 'breath_test_runs', 'breath_test_runs_substrate_check'))) {
-      await client.query(`
-        ALTER TABLE breath_test_runs
-        ADD CONSTRAINT breath_test_runs_substrate_check
-        CHECK (substrate IN ('glucose', 'lactulose', 'unknown'))
-      `);
-    }
-
-    if (await tableExists(client, 'breath_test_points')) {
-      const hasPointsJson = await columnExists(client, 'breath_test_points', 'points_json');
-      const hasMinute = await columnExists(client, 'breath_test_points', 'minute');
-      const hasH2 = await columnExists(client, 'breath_test_points', 'h2');
-      const hasCh4 = await columnExists(client, 'breath_test_points', 'ch4');
-      const hasH2s = await columnExists(client, 'breath_test_points', 'h2s');
-
-      if (hasPointsJson) {
-        await client.query(`
-          UPDATE breath_test_runs run
-          SET points_json = COALESCE(src.points_json, '{}'::jsonb)
-          FROM (
-            SELECT DISTINCT ON (test_id)
-              test_id,
-              COALESCE(points_json, '{}'::jsonb) AS points_json
-            FROM breath_test_points
-            ORDER BY test_id, created_at DESC
-          ) src
-          WHERE run.id = src.test_id
-            AND (run.points_json IS NULL OR run.points_json = '{}'::jsonb)
-        `);
-      } else if (hasMinute && hasH2 && hasCh4) {
-        const h2sExpr = hasH2s ? 'p.h2s' : 'NULL';
-        await client.query(`
-          UPDATE breath_test_runs run
-          SET points_json = COALESCE(src.points_json, '{}'::jsonb)
-          FROM (
-            SELECT
-              p.test_id,
-              COALESCE(
-                jsonb_object_agg(
-                  p.minute::text,
-                  jsonb_strip_nulls(jsonb_build_object('h2', p.h2, 'ch4', p.ch4, 'h2s', ${h2sExpr}))
-                  ORDER BY p.minute
-                ),
-                '{}'::jsonb
-              ) AS points_json
-            FROM breath_test_points p
-            GROUP BY p.test_id
-          ) src
-          WHERE run.id = src.test_id
-            AND (run.points_json IS NULL OR run.points_json = '{}'::jsonb)
-        `);
-      }
-
-      await client.query('DROP TABLE breath_test_points');
-    }
-
-    await client.query(`
-      UPDATE breath_test_runs
-      SET points_json = '{}'::jsonb
-      WHERE points_json IS NULL
-    `);
-    await client.query(`ALTER TABLE breath_test_runs ALTER COLUMN points_json SET DEFAULT '{}'::jsonb`);
-    await client.query('ALTER TABLE breath_test_runs ALTER COLUMN points_json SET NOT NULL');
-
-    if (await columnExists(client, 'breath_test_runs', 'breath_test_type_id')) {
-      await client.query('ALTER TABLE breath_test_runs DROP COLUMN breath_test_type_id');
-    }
-
-    if (await tableExists(client, 'breath_test_types')) {
-      await client.query('DROP TABLE breath_test_types');
-    }
-
-    await client.query('DROP INDEX IF EXISTS idx_breath_test_points_test_minute');
-    await client.query('DROP INDEX IF EXISTS idx_breath_test_points_user_test');
-    await client.query('DROP INDEX IF EXISTS uq_breath_test_points_test_id');
-    await client.query('DROP INDEX IF EXISTS idx_breath_test_points_user_test_date');
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_breath_test_runs_user_created
-      ON breath_test_runs (user_id, created_at DESC)
-    `);
-
-    await client.query('COMMIT');
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
+function isMongoDuplicateKeyError(error: unknown): boolean {
+  return error instanceof MongoServerError && error.code === 11000;
 }
 
 function normalizeEmail(email: string): string {
@@ -374,8 +187,8 @@ function mapUser(row: any): SafeUser {
     id: String(row.id),
     email: String(row.email),
     name: String(row.name),
-    hasCompletedOnboarding: Boolean(row.has_completed_onboarding),
-    emailVerified: Boolean(row.email_verified),
+    hasCompletedOnboarding: Boolean(row.hasCompletedOnboarding ?? row.has_completed_onboarding),
+    emailVerified: Boolean(row.emailVerified ?? row.email_verified),
   };
 }
 
@@ -1157,11 +970,14 @@ function toDateKey(value: unknown): string | null {
 }
 
 function mapSymptomRow(row: any) {
-  const dateKey = toDateKey(row.entry_date) ?? toDateKey(row.date) ?? toDateKey(new Date())!;
+  const dateKey = toDateKey(row.entryDate) ?? toDateKey(row.entry_date) ?? toDateKey(row.date) ?? toDateKey(new Date())!;
+  const createdAt = row.createdAt ?? row.created_at;
+  const updatedAt = row.updatedAt ?? row.updated_at;
+  const userId = row.userId ?? row.user_id;
 
   return {
     id: String(row.id),
-    userId: String(row.user_id),
+    userId: String(userId),
     date: dateKey,
     pain: Number(row.pain),
     stress: Number(row.stress),
@@ -1170,35 +986,39 @@ function mapSymptomRow(row: any) {
     bloating: Number(row.bloating),
     diarrhea: Number(row.diarrhea),
     energy: Number(row.energy),
-    overallGut: Number(row.overall_gut),
+    overallGut: Number(row.overallGut ?? row.overall_gut),
     notes: String(row.notes ?? ''),
-    createdAt: new Date(row.created_at).toISOString(),
-    updatedAt: new Date(row.updated_at).toISOString(),
+    createdAt: new Date(createdAt).toISOString(),
+    updatedAt: new Date(updatedAt).toISOString(),
   };
 }
 
 function mapFoodRow(row: any) {
+  const createdAt = row.createdAt ?? row.created_at;
+
   return {
     id: String(row.id),
     name: String(row.name),
     amount: String(row.amount),
     status: String(row.status) as FoodStatus,
     notes: String(row.notes ?? ''),
-    createdAt: new Date(row.created_at).toISOString(),
+    createdAt: new Date(createdAt).toISOString(),
   };
 }
 
 function mapBreathTestRow(row: any, points: BreathPointInput[]) {
-  const testDate = toDateKey(row.test_date) ?? undefined;
+  const testDate = toDateKey(row.testDate) ?? toDateKey(row.test_date) ?? undefined;
+  const createdAt = row.createdAt ?? row.created_at;
+  const fileName = row.fileName ?? row.file_name;
 
   return {
     id: String(row.id),
-    createdAt: new Date(row.created_at).toISOString(),
+    createdAt: new Date(createdAt).toISOString(),
     testDate,
     substrate: String(row.substrate) as BreathSubstrate,
     units: String(row.units) as BreathUnits,
     notes: String(row.notes ?? ''),
-    fileName: String(row.file_name ?? ''),
+    fileName: String(fileName ?? ''),
     data: points.map((point) => ({
       minute: Number(point.minute),
       h2: Number(point.h2),
@@ -1210,18 +1030,16 @@ function mapBreathTestRow(row: any, points: BreathPointInput[]) {
 
 async function loadUserBySessionToken(token: string): Promise<SafeUser | null> {
   const tokenHash = hashSessionToken(token);
-  const result = await pool.query(
-    `
-    SELECT u.id, u.email, u.name, u.has_completed_onboarding, u.email_verified
-    FROM sessions s
-    INNER JOIN users u ON u.id = s.user_id
-    WHERE s.token_hash = $1 AND s.expires_at > NOW()
-    `,
-    [tokenHash]
-  );
+  const session = await sessionsCollection.findOne({
+    tokenHash,
+    expiresAt: {$gt: new Date()},
+  });
+  if (!session) return null;
 
-  if (result.rowCount === 0) return null;
-  return mapUser(result.rows[0]);
+  const user = await usersCollection.findOne({id: session.userId});
+  if (!user) return null;
+
+  return mapUser(user);
 }
 
 async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -1406,25 +1224,33 @@ app.post('/api/auth/signup', async (req, res) => {
     return;
   }
 
-  const existing = await pool.query(
-    'SELECT id FROM users WHERE email = $1',
-    [email]
-  );
-
-  if (existing.rowCount && existing.rowCount > 0) {
+  const existing = await usersCollection.findOne({email}, {projection: {id: 1}});
+  if (existing) {
     res.status(409).json({success: false, error: 'An account with this email already exists.'});
     return;
   }
 
-  const passwordHash = hashPassword(password);
+  const now = new Date();
+  const doc: UserDocument = {
+    id: crypto.randomUUID(),
+    email,
+    name,
+    passwordHash: hashPassword(password),
+    hasCompletedOnboarding: false,
+    emailVerified: true,
+    createdAt: now,
+    updatedAt: now,
+  };
 
-  await pool.query(
-    `
-    INSERT INTO users (email, name, password_hash)
-    VALUES ($1, $2, $3)
-    `,
-    [email, name, passwordHash]
-  );
+  try {
+    await usersCollection.insertOne(doc);
+  } catch (error) {
+    if (isMongoDuplicateKeyError(error)) {
+      res.status(409).json({success: false, error: 'An account with this email already exists.'});
+      return;
+    }
+    throw error;
+  }
 
   res.status(201).json({success: true, requiresEmailVerification: false});
 });
@@ -1433,22 +1259,13 @@ app.post('/api/auth/login', async (req, res) => {
   const email = normalizeEmail(String(req.body?.email ?? ''));
   const password = String(req.body?.password ?? '');
 
-  const result = await pool.query(
-    `
-    SELECT id, email, name, password_hash, has_completed_onboarding, email_verified
-    FROM users
-    WHERE email = $1
-    `,
-    [email]
-  );
-
-  if (!result.rowCount || result.rowCount === 0) {
+  const userDoc = await usersCollection.findOne({email});
+  if (!userDoc) {
     res.status(401).json({success: false, error: 'Invalid email or password.'});
     return;
   }
 
-  const row = result.rows[0];
-  const validPassword = verifyPassword(password, String(row.password_hash));
+  const validPassword = verifyPassword(password, String(userDoc.passwordHash));
 
   if (!validPassword) {
     res.status(401).json({success: false, error: 'Invalid email or password.'});
@@ -1458,16 +1275,16 @@ app.post('/api/auth/login', async (req, res) => {
   const sessionToken = createSessionToken();
   const tokenHash = hashSessionToken(sessionToken);
 
-  await pool.query(
-    `
-    INSERT INTO sessions (token_hash, user_id, expires_at)
-    VALUES ($1, $2, NOW() + INTERVAL '${sessionDurationDays} days')
-    `,
-    [tokenHash, row.id]
-  );
+  const expiresAt = new Date(Date.now() + sessionDurationDays * 24 * 60 * 60 * 1000);
+  await sessionsCollection.insertOne({
+    tokenHash,
+    userId: userDoc.id,
+    expiresAt,
+    createdAt: new Date(),
+  });
 
   setSessionCookie(res, sessionToken);
-  res.json({success: true, user: mapUser(row)});
+  res.json({success: true, user: mapUser(userDoc)});
 });
 
 app.get('/api/auth/me', async (req, res) => {
@@ -1491,7 +1308,7 @@ app.post('/api/auth/logout', async (req, res) => {
   const sessionToken = getCookieValue(req, sessionCookieName);
   if (sessionToken) {
     const tokenHash = hashSessionToken(sessionToken);
-    await pool.query('DELETE FROM sessions WHERE token_hash = $1', [tokenHash]);
+    await sessionsCollection.deleteOne({tokenHash});
   }
 
   clearSessionCookie(res);
@@ -1502,52 +1319,43 @@ app.post('/api/auth/complete-onboarding', requireAuth, async (req: Authenticated
   const user = requireUser(req, res);
   if (!user) return;
 
-  const data = req.body ?? {};
-  await pool.query(
-    `
-    UPDATE users
-    SET has_completed_onboarding = TRUE, updated_at = NOW()
-    WHERE id = $1
-    `,
-    [user.id]
+  const data = (req.body ?? {}) as Record<string, unknown>;
+  const now = new Date();
+
+  await usersCollection.updateOne(
+    {id: user.id},
+    {
+      $set: {
+        hasCompletedOnboarding: true,
+        updatedAt: now,
+      },
+    }
   );
 
-  await pool.query(
-    `
-    INSERT INTO onboarding_profiles (user_id, data, updated_at)
-    VALUES ($1, $2::jsonb, NOW())
-    ON CONFLICT (user_id)
-    DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
-    `,
-    [user.id, JSON.stringify(data)]
+  await onboardingProfilesCollection.updateOne(
+    {userId: user.id},
+    {
+      $set: {data, updatedAt: now},
+      $setOnInsert: {createdAt: now},
+    },
+    {upsert: true}
   );
 
-  const refreshed = await pool.query(
-    `
-    SELECT id, email, name, has_completed_onboarding, email_verified
-    FROM users
-    WHERE id = $1
-    `,
-    [user.id]
-  );
+  const refreshed = await usersCollection.findOne({id: user.id});
+  if (!refreshed) {
+    res.status(404).json({success: false, error: 'User not found.'});
+    return;
+  }
 
-  res.json({success: true, user: mapUser(refreshed.rows[0])});
+  res.json({success: true, user: mapUser(refreshed)});
 });
 
 app.get('/api/onboarding', requireAuth, async (req: AuthenticatedRequest, res) => {
   const user = requireUser(req, res);
   if (!user) return;
 
-  const result = await pool.query(
-    `
-    SELECT data
-    FROM onboarding_profiles
-    WHERE user_id = $1
-    `,
-    [user.id]
-  );
-
-  const data = result.rowCount && result.rows[0]?.data ? result.rows[0].data : {};
+  const profile = await onboardingProfilesCollection.findOne({userId: user.id});
+  const data = profile?.data ?? {};
   res.json({success: true, data});
 });
 
@@ -1555,19 +1363,14 @@ app.get('/api/symptoms', requireAuth, async (req: AuthenticatedRequest, res) => 
   const user = requireUser(req, res);
   if (!user) return;
 
-  const result = await pool.query(
-    `
-    SELECT id, user_id, entry_date, pain, stress, sleep, stool, bloating, diarrhea, energy, overall_gut, notes, created_at, updated_at
-    FROM symptom_entries
-    WHERE user_id = $1
-    ORDER BY entry_date DESC, updated_at DESC
-    `,
-    [user.id]
-  );
+  const rows = await symptomEntriesCollection
+    .find({userId: user.id})
+    .sort({entryDate: -1, updatedAt: -1})
+    .toArray();
 
   res.json({
     success: true,
-    data: result.rows.map((row) => mapSymptomRow(row)),
+    data: rows.map((row) => mapSymptomRow(row)),
   });
 });
 
@@ -1590,42 +1393,38 @@ app.put('/api/symptoms/:date', requireAuth, async (req: AuthenticatedRequest, re
   const notes = normalizeNotes(req.body?.notes);
   const overallGut = calculateOverallGut(scores);
 
-  const result = await pool.query(
-    `
-    INSERT INTO symptom_entries (
-      user_id, entry_date, pain, stress, sleep, stool, bloating, diarrhea, energy, overall_gut, notes, updated_at
-    )
-    VALUES ($1, $2::date, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
-    ON CONFLICT (user_id, entry_date)
-    DO UPDATE SET
-      pain = EXCLUDED.pain,
-      stress = EXCLUDED.stress,
-      sleep = EXCLUDED.sleep,
-      stool = EXCLUDED.stool,
-      bloating = EXCLUDED.bloating,
-      diarrhea = EXCLUDED.diarrhea,
-      energy = EXCLUDED.energy,
-      overall_gut = EXCLUDED.overall_gut,
-      notes = EXCLUDED.notes,
-      updated_at = NOW()
-    RETURNING id, user_id, entry_date, pain, stress, sleep, stool, bloating, diarrhea, energy, overall_gut, notes, created_at, updated_at
-    `,
-    [
-      user.id,
-      date,
-      scores.pain,
-      scores.stress,
-      scores.sleep,
-      scores.stool,
-      scores.bloating,
-      scores.diarrhea,
-      scores.energy,
-      overallGut,
-      notes,
-    ]
+  const now = new Date();
+  const result = await symptomEntriesCollection.findOneAndUpdate(
+    {userId: user.id, entryDate: date},
+    {
+      $set: {
+        pain: scores.pain,
+        stress: scores.stress,
+        sleep: scores.sleep,
+        stool: scores.stool,
+        bloating: scores.bloating,
+        diarrhea: scores.diarrhea,
+        energy: scores.energy,
+        overallGut,
+        notes,
+        updatedAt: now,
+      },
+      $setOnInsert: {
+        id: crypto.randomUUID(),
+        userId: user.id,
+        entryDate: date,
+        createdAt: now,
+      },
+    },
+    {upsert: true, returnDocument: 'after'}
   );
 
-  res.json({success: true, data: mapSymptomRow(result.rows[0])});
+  if (!result) {
+    res.status(500).json({success: false, error: 'Failed to save symptom entry.'});
+    return;
+  }
+
+  res.json({success: true, data: mapSymptomRow(result)});
 });
 
 app.delete('/api/symptoms/:date', requireAuth, async (req: AuthenticatedRequest, res) => {
@@ -1638,13 +1437,7 @@ app.delete('/api/symptoms/:date', requireAuth, async (req: AuthenticatedRequest,
     return;
   }
 
-  await pool.query(
-    `
-    DELETE FROM symptom_entries
-    WHERE user_id = $1 AND entry_date = $2::date
-    `,
-    [user.id, date]
-  );
+  await symptomEntriesCollection.deleteOne({userId: user.id, entryDate: date});
 
   res.json({success: true});
 });
@@ -1653,19 +1446,14 @@ app.get('/api/food-logs', requireAuth, async (req: AuthenticatedRequest, res) =>
   const user = requireUser(req, res);
   if (!user) return;
 
-  const result = await pool.query(
-    `
-    SELECT id, name, amount, status, notes, created_at
-    FROM food_log_entries
-    WHERE user_id = $1
-    ORDER BY created_at DESC
-    `,
-    [user.id]
-  );
+  const rows = await foodLogEntriesCollection
+    .find({userId: user.id})
+    .sort({createdAt: -1})
+    .toArray();
 
   res.json({
     success: true,
-    data: result.rows.map((row) => mapFoodRow(row)),
+    data: rows.map((row) => mapFoodRow(row)),
   });
 });
 
@@ -1693,16 +1481,18 @@ app.post('/api/food-logs', requireAuth, async (req: AuthenticatedRequest, res) =
     return;
   }
 
-  const result = await pool.query(
-    `
-    INSERT INTO food_log_entries (user_id, name, amount, status, notes)
-    VALUES ($1, $2, $3, $4, $5)
-    RETURNING id, name, amount, status, notes, created_at
-    `,
-    [user.id, name, amount, status, notes]
-  );
+  const row: FoodLogEntryDocument = {
+    id: crypto.randomUUID(),
+    userId: user.id,
+    name,
+    amount,
+    status,
+    notes,
+    createdAt: new Date(),
+  };
+  await foodLogEntriesCollection.insertOne(row);
 
-  res.status(201).json({success: true, data: mapFoodRow(result.rows[0])});
+  res.status(201).json({success: true, data: mapFoodRow(row)});
 });
 
 app.delete('/api/food-logs/:id', requireAuth, async (req: AuthenticatedRequest, res) => {
@@ -1710,16 +1500,9 @@ app.delete('/api/food-logs/:id', requireAuth, async (req: AuthenticatedRequest, 
   if (!user) return;
 
   const id = String(req.params.id ?? '');
-  const result = await pool.query(
-    `
-    DELETE FROM food_log_entries
-    WHERE id = $1 AND user_id = $2
-    RETURNING id
-    `,
-    [id, user.id]
-  );
+  const result = await foodLogEntriesCollection.deleteOne({id, userId: user.id});
 
-  if (!result.rowCount) {
+  if (!result.deletedCount) {
     res.status(404).json({success: false, error: 'Food log entry not found.'});
     return;
   }
@@ -1823,18 +1606,13 @@ app.get('/api/breath-tests', requireAuth, async (req: AuthenticatedRequest, res)
   const user = requireUser(req, res);
   if (!user) return;
 
-  const testsResult = await pool.query(
-    `
-    SELECT id, test_date, substrate, units, notes, file_name, points_json, created_at
-    FROM breath_test_runs
-    WHERE user_id = $1
-    ORDER BY COALESCE(test_date, created_at::date) DESC, created_at DESC
-    `,
-    [user.id]
-  );
+  const rows = await breathTestRunsCollection
+    .find({userId: user.id})
+    .sort({testDate: -1, createdAt: -1})
+    .toArray();
 
-  const tests = testsResult.rows.map((row) =>
-    mapBreathTestRow(row, decodeBreathPoints(row.points_json))
+  const tests = rows.map((row) =>
+    mapBreathTestRow(row, decodeBreathPoints(row.pointsJson))
   );
   res.json({success: true, data: tests});
 });
@@ -1872,46 +1650,48 @@ app.post('/api/breath-tests', requireAuth, async (req: AuthenticatedRequest, res
   const effectiveTestDate = testDate ?? toDateKey(new Date())!;
   const pointsPayload = encodeBreathPoints(data);
   const pointsPayloadJson = JSON.stringify(pointsPayload);
+  const duplicateWindowStart = new Date(Date.now() - 2 * 60 * 1000);
 
   // Guard against accidental multi-click submits creating duplicate rows.
-  const duplicateResult = await pool.query(
-    `
-    SELECT id, test_date, substrate, units, notes, file_name, points_json, created_at
-    FROM breath_test_runs
-    WHERE user_id = $1
-      AND test_date = $2::date
-      AND substrate = $3
-      AND units = $4
-      AND notes = $5
-      AND file_name = $6
-      AND points_json = $7::jsonb
-      AND created_at >= NOW() - INTERVAL '2 minutes'
-    ORDER BY created_at DESC
-    LIMIT 1
-    `,
-    [user.id, effectiveTestDate, substrate, units, notes, fileName, pointsPayloadJson]
+  const duplicateRow = await breathTestRunsCollection.findOne(
+    {
+      userId: user.id,
+      testDate: effectiveTestDate,
+      substrate,
+      units,
+      notes,
+      fileName,
+      pointsJsonCanonical: pointsPayloadJson,
+      createdAt: {$gte: duplicateWindowStart},
+    },
+    {sort: {createdAt: -1}}
   );
 
-  if (duplicateResult.rowCount && duplicateResult.rows[0]) {
+  if (duplicateRow) {
     res.status(200).json({
       success: true,
-      data: mapBreathTestRow(duplicateResult.rows[0], decodeBreathPoints(duplicateResult.rows[0].points_json)),
+      data: mapBreathTestRow(duplicateRow, decodeBreathPoints(duplicateRow.pointsJson)),
     });
     return;
   }
 
-  const testInsert = await pool.query(
-    `
-      INSERT INTO breath_test_runs (user_id, test_date, substrate, units, notes, file_name, points_json)
-      VALUES ($1, $2::date, $3, $4, $5, $6, $7::jsonb)
-      RETURNING id, test_date, substrate, units, notes, file_name, points_json, created_at
-    `,
-    [user.id, effectiveTestDate, substrate, units, notes, fileName, pointsPayloadJson]
-  );
+  const row: BreathTestRunDocument = {
+    id: crypto.randomUUID(),
+    userId: user.id,
+    testDate: effectiveTestDate,
+    substrate,
+    units,
+    notes,
+    fileName,
+    pointsJson: pointsPayload,
+    pointsJsonCanonical: pointsPayloadJson,
+    createdAt: new Date(),
+  };
+  await breathTestRunsCollection.insertOne(row);
 
   res.status(201).json({
     success: true,
-    data: mapBreathTestRow(testInsert.rows[0], data),
+    data: mapBreathTestRow(row, data),
   });
 });
 
@@ -1920,16 +1700,9 @@ app.delete('/api/breath-tests/:id', requireAuth, async (req: AuthenticatedReques
   if (!user) return;
 
   const id = String(req.params.id ?? '');
-  const result = await pool.query(
-    `
-    DELETE FROM breath_test_runs
-    WHERE id = $1 AND user_id = $2
-    RETURNING id
-    `,
-    [id, user.id]
-  );
+  const result = await breathTestRunsCollection.deleteOne({id, userId: user.id});
 
-  if (!result.rowCount) {
+  if (!result.deletedCount) {
     res.status(404).json({success: false, error: 'Breath test not found.'});
     return;
   }
@@ -1941,7 +1714,15 @@ app.delete('/api/auth/account', requireAuth, async (req: AuthenticatedRequest, r
   const user = requireUser(req, res);
   if (!user) return;
 
-  await pool.query('DELETE FROM users WHERE id = $1', [user.id]);
+  await Promise.all([
+    usersCollection.deleteOne({id: user.id}),
+    sessionsCollection.deleteMany({userId: user.id}),
+    onboardingProfilesCollection.deleteOne({userId: user.id}),
+    symptomEntriesCollection.deleteMany({userId: user.id}),
+    foodLogEntriesCollection.deleteMany({userId: user.id}),
+    breathTestRunsCollection.deleteMany({userId: user.id}),
+  ]);
+
   clearSessionCookie(res);
   res.json({success: true});
 });
@@ -1966,8 +1747,8 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 async function startServer() {
-  await pool.query(initSql);
-  await runBreathTestSingleTableMigration();
+  await connectMongo();
+  await ensureMongoIndexes();
   app.listen(port, () => {
     console.log(`Server listening on http://127.0.0.1:${port}`);
   });

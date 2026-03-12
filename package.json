@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "ingest:nih": "tsx scripts/ingest_nih_kb.ts"
+    "ingest:nih": "tsx scripts/ingest_nih_kb.ts",
+    "migrate:postgres-to-mongo": "tsx scripts/migrate_postgres_to_mongodb.ts"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -25,6 +26,7 @@
     "lucide-react": "^0.546.0",
     "lunr": "^2.3.9",
     "motion": "^12.23.24",
+    "mongodb": "^6.20.0",
     "papaparse": "^5.5.3",
     "pdfjs-dist": "^5.4.624",
     "pg": "^8.16.3",

@@ -11,7 +11,7 @@ The goal is to help both people living with SIBO and doctors: reduce symptoms as
 
 - Frontend: React, TypeScript, Vite, Tailwind
 - Backend: Node.js, Express, TypeScript
-- Database: PostgreSQL (Neon)
+- Database: MongoDB
 - Deploy: Render
 - AI/RAG: NIH-only retrieval with LLM API integration
 
@@ -23,7 +23,7 @@ The goal is to help both people living with SIBO and doctors: reduce symptoms as
 npm ci
 ```
 
-2. Create `.env` from `.env.example` and set required values (database URL and API keys).
+2. Create `.env` from `.env.example` and set required values (`MONGODB_URI` and API keys).
 
 3. Run backend:
 
@@ -43,10 +43,20 @@ npm run dev:client
 http://localhost:3000
 ```
 
-## What I Learned
+## Migrate Existing PostgreSQL Data To MongoDB
 
-- How to use and integrate frameworks in a real full-stack project
-- How to manage a cloud database with Neon
-- How to publish/deploy a web app with Render
-- How to implement RAG using verified sources with llama3.1 Groq LLM (like NIH)
-- How API keys work and why they are important
+If you already have existing data in PostgreSQL, run the migration script once.
+
+1. Keep your old PostgreSQL connection in `LEGACY_DATABASE_URL` (or `DATABASE_URL`).
+2. Set MongoDB target in `MONGODB_URI` (and optional `MONGODB_DB_NAME`).
+3. Run:
+
+```bash
+npm run migrate:postgres-to-mongo
+```
+
+4. Start backend normally:
+
+```bash
+npm run dev:server
+```
