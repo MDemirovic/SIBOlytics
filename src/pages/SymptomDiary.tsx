@@ -571,7 +571,7 @@ function Calendar({
           onClick={onPrevMonth}
           className="px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-300 hover:bg-slate-800 transition-colors"
         >
-          ‹
+          {'<'}
         </button>
         <div className="text-sm font-medium text-slate-200">
           {monthStart.toLocaleDateString(isHr ? 'hr-HR' : 'en-US', { month: 'long', year: 'numeric' })}
@@ -582,7 +582,7 @@ function Calendar({
           disabled={currentMonthKey >= todayMonthKey}
           className="px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-300 hover:bg-slate-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          ›
+          {'>'}
         </button>
       </div>
 
