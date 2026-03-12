@@ -3,7 +3,6 @@ import {
   Activity,
   Clock,
   FileText,
-  Sprout,
 } from 'lucide-react';
 import {
   LineChart,
@@ -93,7 +92,7 @@ function getLatestBreathTestSummary(tests: BreathTest[], isHr: boolean): { value
     };
   }
 
-    const analysis = analyzeBreathTest(latest);
+  const analysis = analyzeBreathTest(latest);
 
   if (!analysis.hasData) {
     return {
@@ -158,13 +157,14 @@ export default function Dashboard() {
   const [tests, setTests] = useState<BreathTest[]>([]);
   const [diaryEntries, setDiaryEntries] = useState<SymptomDiaryEntry[]>([]);
   const [chartRange, setChartRange] = useState<ChartRange>(7);
+  const [isMobileChart, setIsMobileChart] = useState(false);
 
   const copy = {
-    todaySymptomScore: isHr ? 'Današnji rezultat simptoma' : "Today's Symptom Score",
-    logSymptoms: isHr ? 'Upiši simptome u Dnevnik simptoma' : 'Log symptoms in Symptom Diary',
+    todaySymptomScore: isHr ? 'Danasnji rezultat simptoma' : "Today's Symptom Score",
+    logSymptoms: isHr ? 'Upisi simptome u Dnevnik simptoma' : 'Log symptoms in Symptom Diary',
     mmcReminder: isHr ? 'MMC podsjetnik' : 'MMC Reminder',
     mmcValue: isHr ? '4h razmak' : '4h Gap',
-    mmcSubtitle: isHr ? 'Pokušaj držati oko 4h izmeðu obroka.' : 'Try to keep around 4h between meals.',
+    mmcSubtitle: isHr ? 'Pokusaj drzati oko 4h izmedu obroka.' : 'Try to keep around 4h between meals.',
     lastBreathTest: isHr ? 'Zadnji izdisajni test' : 'Last Breath Test',
     trendsTitle: isHr ? 'Trend simptoma i stresa' : 'Symptom & Stress Trends',
     trendsSubtitle: isHr ? `Korelacija zadnjih ${chartRange} dana` : `Past ${chartRange} days correlation`,
@@ -174,32 +174,44 @@ export default function Dashboard() {
       ? 'Graf se temelji na dnevnim unosima iz Dnevnika simptoma.'
       : 'Chart is based on your Symptom Diary daily logs.',
     chartCta: isHr
-      ? 'Upiši simptome u Dnevnik simptoma kako bi ovdje vidio trendove.'
+      ? 'Upisi simptome u Dnevnik simptoma kako bi ovdje vidio trendove.'
       : 'Log symptoms in Symptom Diary to see trends here.',
     noChartData: isHr
       ? 'Nema unosa simptoma u ovom periodu. Dodaj dnevne unose za prikaz trenda.'
       : 'No symptom logs yet in this period. Add diary entries to populate the trend chart.',
-    motivationTitle: isHr ? 'Dnevna SIBO motivacija' : 'Daily SIBO Motivation',
-    motivationText: isHr
-      ? 'Oporavak crijeva je maraton, ne sprint. Male, dosljedne navike poput razmaka izmeðu obroka i upravljanja stresom s vremenom èine veliku razliku.'
-      : 'Healing the gut is a marathon, not a sprint. Small, consistent habits like spacing your meals and managing stress make a profound difference over time.',
-    remember: isHr ? 'Zapamti' : 'Remember',
-    rememberText: isHr
-      ? 'Zastoji su normalni. Fokusiraj se na napredak koji si napravio i ostani dosljedan svom planu.'
-      : "Setbacks are normal. Focus on the progress you've made and stay consistent with your plan.",
-    commonPattern: isHr ? 'Uobièajeni obrazac SIBO simptoma' : 'Common SIBO Symptom Pattern',
-    commonPatternText: isHr
-      ? 'Simptomi èesto variraju zbog vremena obroka, vrste hrane, stresa i kvalitete sna. Praæenje kontinuiteta kroz vrijeme obièno daje jasniji uvid nego promatranje samo jednog dana.'
-      : 'Symptoms often fluctuate by meal timing, food type, stress, and sleep quality. Tracking consistency over time usually gives clearer insight than looking at one isolated day.',
-    frequent: isHr ? 'Èesto' : 'Frequent',
-    frequentText: isHr ? 'Nadutost, plinovi, nelagoda u trbuhu' : 'Bloating, gas, abdominal discomfort',
-    patternClues: isHr ? 'Znakovi obrasca' : 'Pattern Clues',
-    patternCluesText: isHr ? 'Gore nakon trigger hrane ili kraæih razmaka izmeðu obroka' : 'Worse after trigger foods or shortened meal gaps',
-    todayFocus: isHr ? 'Današnji fokus' : "Today's Focus",
-    focus1: isHr ? 'Drži otprilike 4 sata izmeðu obroka kad god je moguæe.' : 'Keep approximately 4 hours between meals when possible.',
-    focus2: isHr ? 'Dodaj ili pregledaj svoj zadnji izdisajni test u sekciji Izdisajni testovi.' : 'Add or review your most recent breath test in the Breath Tests section.',
-    focus3: isHr ? 'U Food Hubu provjeri jedan sumnjivi sastojak danas.' : 'Use Food Hub to check one suspected trigger ingredient today.',
+    todayFocus: isHr ? 'Danasnji fokus' : "Today's Focus",
+    focus1: isHr ? 'MMC (4 sata razmaka)' : 'MMC (4-hour gap)',
+    focus2: isHr ? 'Koristi Symptom Log svaki dan.' : 'Use Symptom Log daily.',
+    focus3: isHr ? 'Provjeri tolerancije na hranu.' : 'Check up on food tolerances.',
+    focusNoteTitle: isHr ? 'Brzi podsjetnik' : 'Quick Reminder',
+    focusNoteText: isHr
+      ? 'Konzistentnost je vaznija od savrsenstva. Jedan dobar dan svaki dan.'
+      : 'Consistency matters more than perfection. One solid day at a time.',
+    weeklySnapshot: isHr ? 'Tjedni pregled kontinuiteta' : 'Weekly Consistency Snapshot',
+    weeklySnapshotSubtitle: isHr ? 'Zadnjih 7 dana dnevnika simptoma' : 'Last 7 days from symptom diary',
+    loggedDays: isHr ? 'Uneseni dani' : 'Logged days',
+    avgBloating: isHr ? 'Prosjecna nadutost' : 'Avg bloating',
+    avgStress: isHr ? 'Prosjecan stres' : 'Avg stress',
+    weeklyNudgeGood: isHr ? 'Odlican kontinuitet. Nastavi istim tempom.' : 'Great consistency. Keep this pace.',
+    weeklyNudgeImprove: isHr ? 'Pokusaj unijeti barem 5 od 7 dana za jasniji trend.' : 'Aim for at least 5 of 7 days for clearer trend insights.',
+    quickActions: isHr ? 'Brze akcije' : 'Quick Actions',
+    openSymptomLog: isHr ? 'Otvori Symptom Log' : 'Open Symptom Log',
+    openBreathTests: isHr ? 'Otvori Breath Tests' : 'Open Breath Tests',
+    openFoodHub: isHr ? 'Otvori Food Hub' : 'Open Food Hub',
   };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(max-width: 640px)');
+    const sync = () => setIsMobileChart(media.matches);
+    sync();
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', sync);
+      return () => media.removeEventListener('change', sync);
+    }
+    media.addListener(sync);
+    return () => media.removeListener(sync);
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -278,6 +290,37 @@ export default function Dashboard() {
     [chartData]
   );
 
+  const weeklyStats = useMemo(() => {
+    const last7Dates = getDateSequence(7);
+    const entriesByDate = new Map<string, SymptomDiaryEntry>(
+      diaryEntries.map((entry) => [entry.date, entry])
+    );
+    const weekEntries = last7Dates
+      .map((date) => entriesByDate.get(date))
+      .filter((entry): entry is SymptomDiaryEntry => Boolean(entry));
+
+    if (weekEntries.length === 0) {
+      return {
+        loggedDays: 0,
+        avgBloating: '--',
+        avgStress: '--',
+      };
+    }
+
+    const bloatingAvg = weekEntries.reduce((sum, entry) => sum + entry.bloating, 0) / weekEntries.length;
+    const stressAvg = weekEntries.reduce((sum, entry) => sum + entry.stress, 0) / weekEntries.length;
+
+    return {
+      loggedDays: weekEntries.length,
+      avgBloating: bloatingAvg.toFixed(1),
+      avgStress: stressAvg.toFixed(1),
+    };
+  }, [diaryEntries]);
+
+  const chartMargins = isMobileChart
+    ? { top: 10, right: 8, bottom: 0, left: -18 }
+    : { top: 5, right: 20, bottom: 5, left: 0 };
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -301,7 +344,7 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch min-h-[540px]">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch">
         <div className="xl:col-span-8 bg-slate-900/40 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -327,33 +370,49 @@ export default function Dashboard() {
               {copy.chartCta}
             </button>
           </div>
-          <div className="h-[420px] w-full flex-1">
+          <div className="h-[260px] sm:h-[340px] lg:h-[420px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+              <LineChart data={chartData} margin={chartMargins}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <XAxis dataKey="day" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                <XAxis
+                  dataKey="day"
+                  stroke="#64748b"
+                  fontSize={isMobileChart ? 10 : 12}
+                  tickLine={false}
+                  axisLine={false}
+                  interval={isMobileChart ? 1 : 0}
+                  minTickGap={isMobileChart ? 18 : 8}
+                />
+                <YAxis
+                  stroke="#64748b"
+                  fontSize={isMobileChart ? 10 : 12}
+                  tickLine={false}
+                  axisLine={false}
+                  width={isMobileChart ? 24 : 34}
+                  tickCount={isMobileChart ? 5 : 7}
+                />
                 <Tooltip
                   contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px' }}
                   itemStyle={{ color: '#f8fafc' }}
+                  labelStyle={{ color: '#cbd5e1', fontSize: isMobileChart ? 11 : 12 }}
                 />
                 <Line
                   type="monotone"
                   dataKey="bloating"
                   name={isHr ? 'Nadutost (1-10)' : 'Bloating (1-10)'}
                   stroke="#3b82f6"
-                  strokeWidth={3}
-                  dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#0f172a' }}
-                  activeDot={{ r: 6 }}
+                  strokeWidth={isMobileChart ? 2.25 : 3}
+                  dot={{ r: isMobileChart ? 2.5 : 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#0f172a' }}
+                  activeDot={{ r: isMobileChart ? 4 : 6 }}
                 />
                 <Line
                   type="monotone"
                   dataKey="stress"
                   name={isHr ? 'Stres (1-10)' : 'Stress (1-10)'}
                   stroke="#818cf8"
-                  strokeWidth={3}
+                  strokeWidth={isMobileChart ? 2.25 : 3}
                   strokeDasharray="5 5"
-                  dot={{ r: 4, fill: '#818cf8', strokeWidth: 2, stroke: '#0f172a' }}
+                  dot={{ r: isMobileChart ? 2.5 : 4, fill: '#818cf8', strokeWidth: 2, stroke: '#0f172a' }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -365,48 +424,8 @@ export default function Dashboard() {
           )}
         </div>
 
-        <div className="xl:col-span-4 bg-gradient-to-br from-blue-900/20 to-slate-900/40 border border-blue-900/30 rounded-2xl p-6 backdrop-blur-sm flex flex-col h-full">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
-              <Sprout className="w-4 h-4 text-blue-400" />
-            </div>
-            <h2 className="text-lg font-medium">{copy.motivationTitle}</h2>
-          </div>
-
-          <div className="flex-1 space-y-4">
-            <p className="text-sm text-slate-300 leading-relaxed">
-              {copy.motivationText}
-            </p>
-            <div className="bg-slate-950/50 rounded-xl p-4 border border-slate-800/50">
-              <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">{copy.remember}</h4>
-              <p className="text-sm text-slate-300">
-                {copy.rememberText}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 pb-8">
-        <section className="xl:col-span-7 bg-slate-900/40 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
-          <h3 className="text-base font-medium text-white mb-4">{copy.commonPattern}</h3>
-          <p className="text-sm text-slate-400 leading-relaxed mb-5">
-            {copy.commonPatternText}
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
-              <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">{copy.frequent}</p>
-              <p className="text-sm text-slate-200">{copy.frequentText}</p>
-            </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
-              <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">{copy.patternClues}</p>
-              <p className="text-sm text-slate-200">{copy.patternCluesText}</p>
-            </div>
-          </div>
-        </section>
-
-        <section className="xl:col-span-5 bg-slate-900/40 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
-          <h3 className="text-base font-medium text-white mb-4">{copy.todayFocus}</h3>
+        <div className="xl:col-span-4 bg-slate-900/40 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm h-full flex flex-col">
+          <h2 className="text-lg font-medium text-white mb-4">{copy.todayFocus}</h2>
           <ul className="space-y-3 text-sm text-slate-300">
             <li className="flex items-start gap-2">
               <span className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-400 shrink-0" />
@@ -421,13 +440,62 @@ export default function Dashboard() {
               {copy.focus3}
             </li>
           </ul>
+          <div className="mt-auto pt-5 rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+            <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">{copy.focusNoteTitle}</p>
+            <p className="text-sm text-slate-300 leading-relaxed">{copy.focusNoteText}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 pb-6">
+        <section className="xl:col-span-8 bg-slate-900/40 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
+          <div className="mb-4">
+            <h3 className="text-base font-medium text-white">{copy.weeklySnapshot}</h3>
+            <p className="text-sm text-slate-400">{copy.weeklySnapshotSubtitle}</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+              <p className="text-xs text-slate-500 mb-1 uppercase tracking-wider">{copy.loggedDays}</p>
+              <p className="text-2xl font-semibold text-slate-50">{weeklyStats.loggedDays}/7</p>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+              <p className="text-xs text-slate-500 mb-1 uppercase tracking-wider">{copy.avgBloating}</p>
+              <p className="text-2xl font-semibold text-slate-50">{weeklyStats.avgBloating}</p>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+              <p className="text-xs text-slate-500 mb-1 uppercase tracking-wider">{copy.avgStress}</p>
+              <p className="text-2xl font-semibold text-slate-50">{weeklyStats.avgStress}</p>
+            </div>
+          </div>
+          <p className="text-sm text-slate-300">
+            {weeklyStats.loggedDays >= 5 ? copy.weeklyNudgeGood : copy.weeklyNudgeImprove}
+          </p>
+        </section>
+
+        <section className="xl:col-span-4 bg-slate-900/40 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
+          <h3 className="text-base font-medium text-white mb-4">{copy.quickActions}</h3>
+          <div className="space-y-3">
+            <button
+              onClick={() => navigate('/symptom-diary')}
+              className="w-full text-left rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3 text-sm text-slate-200 hover:border-slate-700 transition-colors"
+            >
+              {copy.openSymptomLog}
+            </button>
+            <button
+              onClick={() => navigate('/breath-tests')}
+              className="w-full text-left rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3 text-sm text-slate-200 hover:border-slate-700 transition-colors"
+            >
+              {copy.openBreathTests}
+            </button>
+            <button
+              onClick={() => navigate('/food-hub')}
+              className="w-full text-left rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3 text-sm text-slate-200 hover:border-slate-700 transition-colors"
+            >
+              {copy.openFoodHub}
+            </button>
+          </div>
         </section>
       </div>
     </div>
   );
 }
-
-
-
-
-

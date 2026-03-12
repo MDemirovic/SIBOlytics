@@ -64,8 +64,8 @@ npm run dev:server
 ## What I Learned
 
 - How to use and integrate frameworks in a real full-stack project
-- How to manage a cloud database with Neon
+- How to manage a cloud database with Neon and MongoDB
 - How to publish/deploy a web app with Render
 - How to implement RAG using verified sources with llama3.1 Groq LLM (like NIH)
-- How API keys work and why they are important
+- How API works and why it is important
 - How to switch and translate data/databases
