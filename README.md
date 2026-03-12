@@ -11,7 +11,7 @@ The goal is to help both people living with SIBO and doctors: reduce symptoms as
 
 - Frontend: React, TypeScript, Vite, Tailwind
 - Backend: Node.js, Express, TypeScript
-- Database: MongoDB
+- Database: MongoDB (was Neon before)
 - Deploy: Render
 - AI/RAG: NIH-only retrieval with LLM API integration
 
@@ -23,7 +23,7 @@ The goal is to help both people living with SIBO and doctors: reduce symptoms as
 npm ci
 ```
 
-2. Create `.env` from `.env.example` and set required values (`MONGODB_URI` and API keys).
+2. Create `.env` from `.env.example` and set required values (database URL and API keys).
 
 3. Run backend:
 
@@ -60,3 +60,12 @@ npm run migrate:postgres-to-mongo
 ```bash
 npm run dev:server
 ```
+
+## What I Learned
+
+- How to use and integrate frameworks in a real full-stack project
+- How to manage a cloud database with Neon
+- How to publish/deploy a web app with Render
+- How to implement RAG using verified sources with llama3.1 Groq LLM (like NIH)
+- How API keys work and why they are important
+- How to switch and translate data/databases
