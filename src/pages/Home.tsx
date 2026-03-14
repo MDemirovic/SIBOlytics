@@ -10,60 +10,60 @@ export default function Home() {
   const { isHr } = useLanguage();
   const firstName = user?.name?.split(' ')[0] || '';
   const copy = {
-    welcome: isHr ? 'DobrodoĹˇao' : 'Welcome',
+    welcome: isHr ? 'Dobrodošao' : 'Welcome',
     subtitle: isHr
-      ? 'Prati izdisajne testove, razumij prehrambene triggere i uÄŤi iz pouzdanih izvora prilagoÄ‘enih SIBO-u.'
+      ? 'Prati izdisajne testove, razumij prehrambene okidače i uči iz pouzdanih izvora prilagođenih SIBO-u.'
       : 'Track your breath tests, understand your food triggers, and learn from reliable evidence tailored for SIBO.',
-    startTracking: isHr ? 'PoÄŤni pratiti' : 'Start Tracking',
-    exploreFoodHub: isHr ? 'IstraĹľi prehranu' : 'Explore Food Hub',
-    learnAboutSibo: isHr ? 'Saznaj viĹˇe o SIBO-u' : 'Learn about SIBO',
+    startTracking: isHr ? 'Počni pratiti' : 'Start Tracking',
+    exploreFoodHub: isHr ? 'Istraži prehranu' : 'Explore Food Hub',
+    learnAboutSibo: isHr ? 'Saznaj više o SIBO-u' : 'Learn about SIBO',
     howItWorks: isHr ? 'Kako funkcionira' : 'How it works',
     stepHint: isHr ? 'Klikni korak za otvaranje modula' : 'Click a step to open the module',
     steps: [
       {
-        title: isHr ? 'BiljeĹľi simptome svaki dan' : 'Log symptoms daily',
+        title: isHr ? 'Bilježi simptome svaki dan' : 'Log symptoms daily',
         desc: isHr
           ? 'Prati bol, nadutost, stolicu, stres, san, proljev i energiju kako bi prepoznao rutine kroz vrijeme.'
           : 'Track pain, bloating, stool, stress, sleep, diarrhea, and energy to spot routines over time.',
       },
       {
-        title: isHr ? 'Interpretacija izdisajnih testova' : 'Track your breath tests',
+        title: isHr ? 'Prati izdisajne testove' : 'Track your breath tests',
         desc: isHr
-          ? 'Unesi rezultate ruÄŤno ili ih dodaj kao gotov test kako bi izgradio vremensku liniju.'
+          ? 'Unesi rezultate ručno ili ih dodaj kao gotov test kako bi izgradio vremensku liniju.'
           : 'Upload results or add them manually to build your timeline.',
       },
       {
-        title: isHr ? 'Razumij prehrambene triggere' : 'Understand your food triggers',
+        title: isHr ? 'Razumij prehrambene okidače' : 'Understand your food triggers',
         desc: isHr
-          ? 'Koristi Food Hub za uoÄŤavanje obrazaca i smanjenje pogorĹˇanja simptoma.'
+          ? 'Koristi Food Hub za uočavanje obrazaca i smanjenje pogoršanja simptoma.'
           : 'Use the Food Hub to find patterns and reduce symptom flare-ups.',
       },
       {
-        title: isHr ? 'UÄŤi iz znanstvenih izvora' : 'Learn from evidence-based research',
+        title: isHr ? 'Uči iz znanstvenih izvora' : 'Learn from evidence-based research',
         desc: isHr
-          ? 'Postavljaj pitanja i pregledaj NIH izvore s citatima, ukljuÄŤujuÄ‡i novo Pimentelovo istraĹľivanje iz 2026.'
+          ? 'Postavljaj pitanja i pregledaj NIH izvore s citatima, uključujući novo Pimentelovo istraživanje iz 2026.'
           : 'Ask questions and review NIH-only sources with citations, including new Pimentel research from 2026.',
       },
       {
-        title: isHr ? 'Podijeli kljuÄŤne zapise' : 'Share your key logs',
+        title: isHr ? 'Podijeli ključne zapise' : 'Share your key logs',
         desc: isHr
-          ? 'Ponesi symptom timeline, food log i rezultate izdisajnih testova lijeÄŤniku.'
+          ? 'Ponesi vremensku liniju simptoma, dnevnik hrane i rezultate izdisajnih testova liječniku.'
           : 'Bring your symptom timeline, food log, and breath test results to your clinician.',
       },
       {
-        title: isHr ? 'Nauci o SIBO-u' : 'Learn about SIBO',
+        title: isHr ? 'Nauči o SIBO-u' : 'Learn about SIBO',
         desc: isHr
-          ? 'U Education modulu procitaj osnove o simptomima, uzrocima, testiranju i preporukama za sljedece korake.'
+          ? 'U Education modulu pročitaj osnove o simptomima, uzrocima, testiranju i preporukama za sljedeće korake.'
           : 'Use the Education module to learn the essentials about symptoms, causes, testing, and practical next steps.',
       },
     ],
-    whyTitle: isHr ? 'ZaĹˇto SIBOlytics?' : 'Why SIBOlytics?',
+    whyTitle: isHr ? 'Zašto SIBOlytics?' : 'Why SIBOlytics?',
     whyItems: isHr
       ? [
-          'PraÄ‡enje izdisajnih testova',
+          'Praćenje izdisajnih testova',
           'Izgradi osobni dnevnik tolerancije hrane',
-          'UÄŤi iz NIH izvora',
-          'Koristi Clinical Summary za pregled vaĹľnih podataka i prepoznavanje obrazaca za dijagnostiku',
+          'Uči iz NIH izvora',
+          'Koristi Clinical Summary za pregled važnih podataka i prepoznavanje obrazaca za dijagnostiku',
         ]
       : [
           'Track breath tests',
@@ -71,12 +71,12 @@ export default function Home() {
           'Learn from NIH-only sources',
           'Use Clinical Summary to keep key information in one place and spot diagnostic patterns',
         ],
-    tipsTitle: isHr ? 'Savjet za poÄŤetak' : 'Getting Started Tip',
+    tipsTitle: isHr ? 'Savjet za početak' : 'Getting Started Tip',
     tips: isHr
       ? [
-          'PoÄŤni s prvim izdisajnim testom kako bi postavio jasnu poÄŤetnu toÄŤku.',
-          'Pregledaj Food Hub nakon logiranja simptoma kako bi otkrio moguÄ‡e triggere.',
-          'Ponesi symptom timeline, food log i rezultate izdisajnih testova lijeÄŤniku za preciznije odluke.',
+          'Počni s prvim izdisajnim testom kako bi postavio jasnu početnu točku.',
+          'Pregledaj Food Hub nakon logiranja simptoma kako bi otkrio moguće okidače.',
+          'Ponesi vremensku liniju simptoma, dnevnik hrane i rezultate izdisajnih testova liječniku za preciznije odluke.',
         ]
       : [
           'Start by adding your first breath test to establish a clear baseline.',

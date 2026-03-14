@@ -80,8 +80,8 @@ const languageCopy = {
   },
   hr: {
     nav: {
-      home: 'Pocetna',
-      dashboard: 'Nadzorna ploca',
+      home: 'Početna',
+      dashboard: 'Nadzorna ploča',
       symptomLog: 'Dnevnik simptoma',
       breathTests: 'Izdisajni testovi',
       foodHub: 'Prehrana',
@@ -91,7 +91,7 @@ const languageCopy = {
       settings: 'Postavke',
     },
     header: {
-      home: 'Pocetna',
+      home: 'Početna',
       dashboardTitle: (name: string) => `Dobro jutro, ${name}`,
       dashboardSubtitle: 'Ovdje je tvoj dnevni pregled probave.',
       symptomDiaryTitle: 'Dnevnik simptoma',
