@@ -1251,8 +1251,18 @@ app.post('/api/auth/signup', async (req, res) => {
     }
     throw error;
   }
+  const sessionToken = createSessionToken();
+  const tokenHash = hashSessionToken(sessionToken);
+  const expiresAt = new Date(Date.now() + sessionDurationDays * 24 * 60 * 60 * 1000);
+  await sessionsCollection.insertOne({
+    tokenHash,
+    userId: doc.id,
+    expiresAt,
+    createdAt: new Date(),
+  });
 
-  res.status(201).json({success: true, requiresEmailVerification: false});
+  setSessionCookie(res, sessionToken);
+  res.status(201).json({success: true, requiresEmailVerification: false, user: mapUser(doc)});
 });
 
 app.post('/api/auth/login', async (req, res) => {

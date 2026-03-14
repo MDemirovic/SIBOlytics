@@ -31,7 +31,7 @@ export default function Signup() {
       return;
     }
 
-    navigate('/login');
+    navigate('/home');
   };
 
   return (

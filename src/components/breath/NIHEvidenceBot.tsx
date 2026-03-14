@@ -132,6 +132,8 @@ export default function NIHEvidenceBot() {
     setInput(prompt);
   };
 
+  const showQuickPrompts = !messages.some((message) => message.role === 'user');
+
   return (
     <div className="bg-slate-900/40 border border-slate-800 rounded-2xl flex flex-col h-full backdrop-blur-sm overflow-hidden">
       <div className="bg-slate-950/80 border-b border-slate-800 p-4 flex items-center justify-between">
@@ -208,29 +210,31 @@ export default function NIHEvidenceBot() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="px-4 pb-2 flex gap-2 overflow-x-auto no-scrollbar">
-        <button
-          onClick={() => handleQuickPrompt('What is considered a positive hydrogen breath test?')}
-          className="whitespace-nowrap text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-full transition-colors border border-slate-700"
-          disabled={isSending}
-        >
-          Positive H2 criteria?
-        </button>
-        <button
-          onClick={() => handleQuickPrompt('What is the connection between IBS and SIBO?')}
-          className="whitespace-nowrap text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-full transition-colors border border-slate-700"
-          disabled={isSending}
-        >
-          IBS overlap?
-        </button>
-        <button
-          onClick={() => handleQuickPrompt('How does a low FODMAP diet help?')}
-          className="whitespace-nowrap text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-full transition-colors border border-slate-700"
-          disabled={isSending}
-        >
-          FODMAP diet?
-        </button>
-      </div>
+      {showQuickPrompts && (
+        <div className="px-4 pb-2 flex gap-2 overflow-x-auto no-scrollbar">
+          <button
+            onClick={() => handleQuickPrompt('What is considered a positive hydrogen breath test?')}
+            className="whitespace-nowrap text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-full transition-colors border border-slate-700"
+            disabled={isSending}
+          >
+            Positive H2 criteria?
+          </button>
+          <button
+            onClick={() => handleQuickPrompt('What is the connection between IBS and SIBO?')}
+            className="whitespace-nowrap text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-full transition-colors border border-slate-700"
+            disabled={isSending}
+          >
+            IBS overlap?
+          </button>
+          <button
+            onClick={() => handleQuickPrompt('How does a low FODMAP diet help?')}
+            className="whitespace-nowrap text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-full transition-colors border border-slate-700"
+            disabled={isSending}
+          >
+            FODMAP diet?
+          </button>
+        </div>
+      )}
 
       <div className="p-4 bg-slate-950/50 border-t border-slate-800">
         <form onSubmit={handleSend} className="relative">

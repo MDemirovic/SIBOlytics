@@ -140,6 +140,10 @@ export function AuthProvider({children}: {children: React.ReactNode}) {
         };
       }
 
+      if (result.user) {
+        setUser(result.user);
+      }
+
       return {
         success: true,
         requiresEmailVerification: Boolean(result.requiresEmailVerification),

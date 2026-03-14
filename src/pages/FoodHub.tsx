@@ -422,9 +422,12 @@ export default function FoodHub() {
 
   const copy = {
     title: isHr ? 'Prehrana' : 'Food Hub',
-    subtitle: isHr
+    subtitleDatabase: isHr
       ? 'Low FODMAP prehrana privremeno smanjuje fermentabilne ugljikohidrate kako bi se prepoznali triggeri i smanjile tegobe. Koristi bazu u eliminacijskoj fazi, pa zatim uvodi hranu jednu po jednu.'
       : 'A low FODMAP diet temporarily reduces certain fermentable carbohydrates to help identify symptom triggers and manage digestive discomfort. Use this database during your elimination phase, then gradually reintroduce foods one by one.',
+    subtitleLog: isHr
+      ? 'Ovdje mozes unositi svoje osobne reakcije na bilo koju hranu, neovisno o tome je li low FODMAP ili nije.'
+      : 'You can log your personal reactions to any food here, regardless of whether it is low FODMAP or not.',
     tabDatabase: isHr ? 'Low FODMAP baza' : 'Low FODMAP Database',
     tabLog: isHr ? 'Osobni dnevnik hrane' : 'Personal Food Log',
     searchFoods: isHr ? 'Pretrazi namirnice...' : 'Search foods...',
@@ -592,7 +595,9 @@ export default function FoodHub() {
     <div className="space-y-6">
       <header>
         <h1 className="text-3xl font-semibold tracking-tight text-white mb-2">{copy.title}</h1>
-        <p className="text-slate-400 max-w-3xl">{copy.subtitle}</p>
+        <p className="text-slate-400 max-w-3xl">
+          {activeTab === 'database' ? copy.subtitleDatabase : copy.subtitleLog}
+        </p>
       </header>
 
       {error && (
