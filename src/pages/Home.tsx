@@ -1,6 +1,6 @@
-import React from 'react';
+﻿import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, Bot, BookOpen, CheckCircle2, FileText, Utensils } from 'lucide-react';
+import { Activity, ArrowUpRight, Bot, BookOpen, CheckCircle2, ClipboardList, FileText, Utensils } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -10,17 +10,18 @@ export default function Home() {
   const { isHr } = useLanguage();
   const firstName = user?.name?.split(' ')[0] || '';
   const copy = {
-    welcome: isHr ? 'Dobrodošao' : 'Welcome',
+    welcome: isHr ? 'DobrodoĹˇao' : 'Welcome',
     subtitle: isHr
-      ? 'Prati izdisajne testove, razumij prehrambene triggere i uči iz pouzdanih izvora prilagođenih SIBO-u.'
+      ? 'Prati izdisajne testove, razumij prehrambene triggere i uÄŤi iz pouzdanih izvora prilagoÄ‘enih SIBO-u.'
       : 'Track your breath tests, understand your food triggers, and learn from reliable evidence tailored for SIBO.',
-    startTracking: isHr ? 'Počni pratiti' : 'Start Tracking',
-    exploreFoodHub: isHr ? 'Istraži prehranu' : 'Explore Food Hub',
-    learnAboutSibo: isHr ? 'Saznaj više o SIBO-u' : 'Learn about SIBO',
+    startTracking: isHr ? 'PoÄŤni pratiti' : 'Start Tracking',
+    exploreFoodHub: isHr ? 'IstraĹľi prehranu' : 'Explore Food Hub',
+    learnAboutSibo: isHr ? 'Saznaj viĹˇe o SIBO-u' : 'Learn about SIBO',
     howItWorks: isHr ? 'Kako funkcionira' : 'How it works',
+    stepHint: isHr ? 'Klikni korak za otvaranje modula' : 'Click a step to open the module',
     steps: [
       {
-        title: isHr ? 'Bilježi simptome svaki dan' : 'Log symptoms daily',
+        title: isHr ? 'BiljeĹľi simptome svaki dan' : 'Log symptoms daily',
         desc: isHr
           ? 'Prati bol, nadutost, stolicu, stres, san, proljev i energiju kako bi prepoznao rutine kroz vrijeme.'
           : 'Track pain, bloating, stool, stress, sleep, diarrhea, and energy to spot routines over time.',
@@ -28,48 +29,54 @@ export default function Home() {
       {
         title: isHr ? 'Interpretacija izdisajnih testova' : 'Track your breath tests',
         desc: isHr
-          ? 'Unesi rezultate ručno ili ih dodaj kao gotov test kako bi izgradio vremensku liniju.'
+          ? 'Unesi rezultate ruÄŤno ili ih dodaj kao gotov test kako bi izgradio vremensku liniju.'
           : 'Upload results or add them manually to build your timeline.',
       },
       {
         title: isHr ? 'Razumij prehrambene triggere' : 'Understand your food triggers',
         desc: isHr
-          ? 'Koristi Food Hub za uočavanje obrazaca i smanjenje pogoršanja simptoma.'
+          ? 'Koristi Food Hub za uoÄŤavanje obrazaca i smanjenje pogorĹˇanja simptoma.'
           : 'Use the Food Hub to find patterns and reduce symptom flare-ups.',
       },
       {
-        title: isHr ? 'Uči iz znanstvenih izvora' : 'Learn from evidence-based research',
+        title: isHr ? 'UÄŤi iz znanstvenih izvora' : 'Learn from evidence-based research',
         desc: isHr
-          ? 'Postavljaj pitanja i pregledaj NIH izvore s citatima, uključujući novo Pimentelovo istraživanje iz 2026.'
+          ? 'Postavljaj pitanja i pregledaj NIH izvore s citatima, ukljuÄŤujuÄ‡i novo Pimentelovo istraĹľivanje iz 2026.'
           : 'Ask questions and review NIH-only sources with citations, including new Pimentel research from 2026.',
       },
       {
-        title: isHr ? 'Podijeli ključne zapise' : 'Share your key logs',
+        title: isHr ? 'Podijeli kljuÄŤne zapise' : 'Share your key logs',
         desc: isHr
-          ? 'Ponesi symptom timeline, food log i rezultate izdisajnih testova liječniku.'
+          ? 'Ponesi symptom timeline, food log i rezultate izdisajnih testova lijeÄŤniku.'
           : 'Bring your symptom timeline, food log, and breath test results to your clinician.',
       },
+      {
+        title: isHr ? 'Nauci o SIBO-u' : 'Learn about SIBO',
+        desc: isHr
+          ? 'U Education modulu procitaj osnove o simptomima, uzrocima, testiranju i preporukama za sljedece korake.'
+          : 'Use the Education module to learn the essentials about symptoms, causes, testing, and practical next steps.',
+      },
     ],
-    whyTitle: isHr ? 'Zašto SIBOlytics?' : 'Why SIBOlytics?',
+    whyTitle: isHr ? 'ZaĹˇto SIBOlytics?' : 'Why SIBOlytics?',
     whyItems: isHr
       ? [
-          'Praćenje izdisajnih testova',
+          'PraÄ‡enje izdisajnih testova',
           'Izgradi osobni dnevnik tolerancije hrane',
-          'Uči iz NIH izvora',
-          'Koristi priče o uspjehu za motivaciju',
+          'UÄŤi iz NIH izvora',
+          'Koristi Clinical Summary za pregled vaĹľnih podataka i prepoznavanje obrazaca za dijagnostiku',
         ]
       : [
           'Track breath tests',
           'Build your personal food tolerance log',
           'Learn from NIH-only sources',
-          'Use success stories for motivation',
+          'Use Clinical Summary to keep key information in one place and spot diagnostic patterns',
         ],
-    tipsTitle: isHr ? 'Savjet za početak' : 'Getting Started Tip',
+    tipsTitle: isHr ? 'Savjet za poÄŤetak' : 'Getting Started Tip',
     tips: isHr
       ? [
-          'Počni s prvim izdisajnim testom kako bi postavio jasnu početnu točku.',
-          'Pregledaj Food Hub nakon logiranja simptoma kako bi otkrio moguće triggere.',
-          'Ponesi symptom timeline, food log i rezultate izdisajnih testova liječniku za preciznije odluke.',
+          'PoÄŤni s prvim izdisajnim testom kako bi postavio jasnu poÄŤetnu toÄŤku.',
+          'Pregledaj Food Hub nakon logiranja simptoma kako bi otkrio moguÄ‡e triggere.',
+          'Ponesi symptom timeline, food log i rezultate izdisajnih testova lijeÄŤniku za preciznije odluke.',
         ]
       : [
           'Start by adding your first breath test to establish a clear baseline.',
@@ -77,6 +84,63 @@ export default function Home() {
           'Bring your symptom timeline, food log, and breath test results to your clinician for focused decisions.',
         ],
   };
+
+  const stepVisuals: Array<{
+    route: string;
+    icon: React.ComponentType<{ className?: string }>;
+    badgeClass: string;
+    iconClass: string;
+    accentBarClass: string;
+  }> = [
+    {
+      route: '/symptom-diary',
+      icon: FileText,
+      badgeClass: 'bg-cyan-500/10 text-cyan-400',
+      iconClass: 'text-cyan-400',
+      accentBarClass: 'bg-cyan-400/70',
+    },
+    {
+      route: '/breath-tests',
+      icon: Activity,
+      badgeClass: 'bg-blue-500/10 text-blue-400',
+      iconClass: 'text-blue-400',
+      accentBarClass: 'bg-blue-400/70',
+    },
+    {
+      route: '/food-hub',
+      icon: Utensils,
+      badgeClass: 'bg-amber-500/10 text-amber-400',
+      iconClass: 'text-amber-400',
+      accentBarClass: 'bg-amber-400/70',
+    },
+    {
+      route: '/nih-evidence',
+      icon: Bot,
+      badgeClass: 'bg-indigo-500/10 text-indigo-400',
+      iconClass: 'text-indigo-400',
+      accentBarClass: 'bg-indigo-400/70',
+    },
+    {
+      route: '/summary',
+      icon: ClipboardList,
+      badgeClass: 'bg-emerald-500/10 text-emerald-400',
+      iconClass: 'text-emerald-400',
+      accentBarClass: 'bg-emerald-400/70',
+    },
+    {
+      route: '/education',
+      icon: BookOpen,
+      badgeClass: 'bg-violet-500/10 text-violet-400',
+      iconClass: 'text-violet-400',
+      accentBarClass: 'bg-violet-400/70',
+    },
+  ];
+
+  const steps = copy.steps.map((step, index) => ({
+    ...step,
+    ...stepVisuals[index],
+    number: index + 1,
+  }));
 
   return (
     <div className="space-y-10 md:space-y-12 w-full">
@@ -117,77 +181,44 @@ export default function Home() {
 
       {/* How It Works */}
       <section>
-        <h2 className="text-xl font-medium text-white mb-4">{copy.howItWorks}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-          <button
-            onClick={() => navigate('/symptom-diary')}
-            className="text-left bg-slate-900/35 border border-slate-800 rounded-2xl p-6 h-full hover:border-slate-700 transition-colors"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 font-semibold">
-                1
-              </div>
-              <FileText className="w-5 h-5 text-cyan-400" />
-            </div>
-            <h3 className="text-base font-medium text-white mb-2">{copy.steps[0].title}</h3>
-            <p className="text-sm text-slate-400">{copy.steps[0].desc}</p>
-          </button>
+        <div className="mb-4 flex flex-col md:flex-row md:items-end md:justify-between gap-2">
+          <h2 className="text-xl font-medium text-white">{copy.howItWorks}</h2>
+          <p className="text-xs text-slate-500 uppercase tracking-wide">{copy.stepHint}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/35 p-3 md:p-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {steps.map((step) => {
+              const Icon = step.icon;
+              return (
+                <button
+                  key={step.number}
+                  onClick={() => navigate(step.route)}
+                  className="group relative text-left rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-4 md:px-5 md:py-5 hover:border-slate-700 hover:bg-slate-800/70 transition-all"
+                >
+                  <span className={`absolute left-0 top-3 bottom-3 w-1 rounded-r ${step.accentBarClass}`}></span>
+                  <div className="grid grid-cols-[auto,1fr,auto] items-start gap-3 pl-2">
+                    <div className="flex items-center gap-2 pt-0.5">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold ${step.badgeClass}`}>
+                        {step.number}
+                      </div>
+                      <Icon className={`w-[18px] h-[18px] ${step.iconClass}`} />
+                    </div>
 
-          <button
-            onClick={() => navigate('/breath-tests')}
-            className="text-left bg-slate-900/35 border border-slate-800 rounded-2xl p-6 h-full hover:border-slate-700 transition-colors"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 font-semibold">
-                2
-              </div>
-              <Activity className="w-5 h-5 text-blue-400" />
-            </div>
-            <h3 className="text-base font-medium text-white mb-2">{copy.steps[1].title}</h3>
-            <p className="text-sm text-slate-400">{copy.steps[1].desc}</p>
-          </button>
+                    <div>
+                      <h3 className="text-base md:text-lg font-semibold text-white leading-snug">
+                        {step.title}
+                      </h3>
+                      <p className="mt-1.5 text-sm md:text-[15px] text-slate-400 leading-relaxed">
+                        {step.desc}
+                      </p>
+                    </div>
 
-          <button
-            onClick={() => navigate('/food-hub')}
-            className="text-left bg-slate-900/35 border border-slate-800 rounded-2xl p-6 h-full hover:border-slate-700 transition-colors"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 font-semibold">
-                3
-              </div>
-              <Utensils className="w-5 h-5 text-amber-400" />
-            </div>
-            <h3 className="text-base font-medium text-white mb-2">{copy.steps[2].title}</h3>
-            <p className="text-sm text-slate-400">{copy.steps[2].desc}</p>
-          </button>
-
-          <button
-            onClick={() => navigate('/nih-evidence')}
-            className="text-left bg-slate-900/35 border border-slate-800 rounded-2xl p-6 h-full hover:border-slate-700 transition-colors"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-semibold">
-                4
-              </div>
-              <Bot className="w-5 h-5 text-indigo-400" />
-            </div>
-            <h3 className="text-base font-medium text-white mb-2">{copy.steps[3].title}</h3>
-            <p className="text-sm text-slate-400">{copy.steps[3].desc}</p>
-          </button>
-
-          <button
-            onClick={() => navigate('/summary')}
-            className="text-left bg-slate-900/35 border border-slate-800 rounded-2xl p-6 h-full hover:border-slate-700 transition-colors"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 font-semibold">
-                5
-              </div>
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-            </div>
-            <h3 className="text-base font-medium text-white mb-2">{copy.steps[4].title}</h3>
-            <p className="text-sm text-slate-400">{copy.steps[4].desc}</p>
-          </button>
+                    <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-slate-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </section>
 
@@ -225,3 +256,4 @@ export default function Home() {
     </div>
   );
 }
+

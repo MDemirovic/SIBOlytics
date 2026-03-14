@@ -423,7 +423,7 @@ export default function FoodHub() {
   const copy = {
     title: isHr ? 'Prehrana' : 'Food Hub',
     subtitleDatabase: isHr
-      ? 'Low FODMAP prehrana privremeno smanjuje fermentabilne ugljikohidrate kako bi se prepoznali triggeri i smanjile tegobe. Koristi bazu u eliminacijskoj fazi, pa zatim uvodi hranu jednu po jednu.'
+      ? 'Low FODMAP prehrana privremeno smanjuje fermentabilne ugljikohidrate kako bi se prepoznali okidaci i smanjile tegobe. Koristi bazu u eliminacijskoj fazi, pa zatim uvodi hranu jednu po jednu.'
       : 'A low FODMAP diet temporarily reduces certain fermentable carbohydrates to help identify symptom triggers and manage digestive discomfort. Use this database during your elimination phase, then gradually reintroduce foods one by one.',
     subtitleLog: isHr
       ? 'Ovdje mozes unositi svoje osobne reakcije na bilo koju hranu, neovisno o tome je li low FODMAP ili nije.'
@@ -451,7 +451,7 @@ export default function FoodHub() {
     saveFood: isHr ? 'Spremi hranu' : 'Save Food',
     safeGreen: isHr ? 'Sigurno (zeleno)' : 'Safe (Green)',
     cautionOrange: isHr ? 'Oprez (narancasto)' : 'Caution (Orange)',
-    triggerRed: isHr ? 'Trigger (crveno)' : 'Trigger (Red)',
+    triggerRed: isHr ? 'Okidac (crveno)' : 'Trigger (Red)',
     deleteTitle: isHr ? 'Obrisati ovaj unos hrane?' : 'Delete this food log?',
     deleteTextA: isHr ? 'Ova radnja se ne moze ponistiti. Brises' : 'This action cannot be undone. You are deleting',
     deleteTextB: isHr ? 'iz osobnog dnevnika.' : 'from your personal log.',
@@ -460,7 +460,7 @@ export default function FoodHub() {
     highFodmap: isHr ? 'Visoki FODMAP' : 'High FODMAP',
     safe: isHr ? 'Sigurno' : 'Safe',
     caution: isHr ? 'Oprez' : 'Caution',
-    trigger: 'Trigger',
+    trigger: isHr ? 'Okidac' : 'Trigger',
     loadError: isHr ? 'Ucavanje dnevnika hrane nije uspjelo.' : 'Could not load food log.',
     saveError: isHr ? 'Spremanje hrane nije uspjelo.' : 'Could not save food log.',
     deleteError: isHr ? 'Brisanje hrane nije uspjelo.' : 'Could not delete food log.',

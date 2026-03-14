@@ -61,6 +61,22 @@ export default function NIHEvidenceBot() {
   const [isSending, setIsSending] = useState(false);
   const [apiError, setApiError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const quickPrompts = useMemo(
+    () => (
+      isHr
+        ? [
+            { label: 'Pozitivan H2 kriterij?', prompt: 'Sto se smatra pozitivnim H2 breath testom?' },
+            { label: 'IBS povezanost?', prompt: 'Koja je povezanost izmedu IBS-a i SIBO-a?' },
+            { label: 'FODMAP prehrana?', prompt: 'Kako low FODMAP prehrana pomaze?' },
+          ]
+        : [
+            { label: 'Positive H2 criteria?', prompt: 'What is considered a positive hydrogen breath test?' },
+            { label: 'IBS overlap?', prompt: 'What is the connection between IBS and SIBO?' },
+            { label: 'FODMAP diet?', prompt: 'How does a low FODMAP diet help?' },
+          ]
+    ),
+    [isHr]
+  );
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -212,27 +228,16 @@ export default function NIHEvidenceBot() {
 
       {showQuickPrompts && (
         <div className="px-4 pb-2 flex gap-2 overflow-x-auto no-scrollbar">
-          <button
-            onClick={() => handleQuickPrompt('What is considered a positive hydrogen breath test?')}
-            className="whitespace-nowrap text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-full transition-colors border border-slate-700"
-            disabled={isSending}
-          >
-            Positive H2 criteria?
-          </button>
-          <button
-            onClick={() => handleQuickPrompt('What is the connection between IBS and SIBO?')}
-            className="whitespace-nowrap text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-full transition-colors border border-slate-700"
-            disabled={isSending}
-          >
-            IBS overlap?
-          </button>
-          <button
-            onClick={() => handleQuickPrompt('How does a low FODMAP diet help?')}
-            className="whitespace-nowrap text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-full transition-colors border border-slate-700"
-            disabled={isSending}
-          >
-            FODMAP diet?
-          </button>
+          {quickPrompts.map((item) => (
+            <button
+              key={item.label}
+              onClick={() => handleQuickPrompt(item.prompt)}
+              className="whitespace-nowrap text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-full transition-colors border border-slate-700"
+              disabled={isSending}
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
       )}
 

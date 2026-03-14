@@ -125,7 +125,7 @@ export default function DoctorReport() {
     loginPrompt: isHr ? 'Prijavi se za pregled i izvoz personaliziranog izvještaja.' : 'Sign in to view and export your personalized report.',
     title: isHr ? 'Personalizirani sažetak' : 'Personalized Summary',
     subtitle: isHr
-      ? 'Jedna pregledna stranica za pacijenta i kliničara: baseline, simptomi, food triggeri i breath testovi.'
+      ? 'Jedna pregledna stranica za pacijenta i klinicara: pocetni podaci, simptomi, prehrambeni okidaci i izdisajni testovi.'
       : 'One clear page for patients and clinicians: baseline, symptoms, food triggers, and breath tests.',
     generatedOn: isHr ? 'Generirano' : 'Generated',
     printPdf: isHr ? 'Ispiši / Spremi PDF' : 'Print / Save PDF',
@@ -135,20 +135,20 @@ export default function DoctorReport() {
     primarySymptom: isHr ? 'Primarni simptom' : 'Primary symptom',
     severity: isHr ? 'Početna težina' : 'Initial severity',
     stoolPattern: isHr ? 'Uzorak stolice' : 'Stool pattern',
-    suspectedTriggers: isHr ? 'Sumnjivi triggeri' : 'Suspected triggers',
+    suspectedTriggers: isHr ? 'Sumnjivi okidaci' : 'Suspected triggers',
     notProvided: isHr ? 'Nije uneseno' : 'Not provided',
     symptomSummary: isHr ? 'Sažetak simptoma' : 'Symptom Summary',
-    avgOverall: isHr ? 'Prosjek overall gut' : 'Average overall gut',
-    latestOverall: isHr ? 'Zadnji overall gut' : 'Latest overall gut',
-    totalLogs: isHr ? 'Ukupno symptom log unosa' : 'Total symptom log entries',
-    topBurdens: isHr ? 'Glavni simptom burden (niži score = gore)' : 'Main symptom burdens (lower score = worse)',
+    avgOverall: isHr ? 'Prosjek ukupnog stanja crijeva' : 'Average overall gut',
+    latestOverall: isHr ? 'Zadnje ukupno stanje crijeva' : 'Latest overall gut',
+    totalLogs: isHr ? 'Ukupno unosa dnevnika simptoma' : 'Total symptom log entries',
+    topBurdens: isHr ? 'Najvece opterecenje simptoma (nizi score = gore)' : 'Main symptom burdens (lower score = worse)',
     symptomAverages: isHr ? 'Prosjeci po simptomu' : 'Averages by symptom',
-    recentSymptomLog: isHr ? 'Zadnji symptom log unosi' : 'Recent symptom log entries',
-    foodSummary: isHr ? 'Sažetak food triggera' : 'Food Trigger Summary',
-    topTriggers: isHr ? 'Najčešći triggeri' : 'Most frequent triggers',
-    triggerLog: isHr ? 'Trigger log (s bilješkama)' : 'Trigger log (with notes)',
-    breathSummary: isHr ? 'Breath test sažetak' : 'Breath Test Summary',
-    latestBreath: isHr ? 'Zadnji breath test' : 'Latest breath test',
+    recentSymptomLog: isHr ? 'Zadnji unosi dnevnika simptoma' : 'Recent symptom log entries',
+    foodSummary: isHr ? 'Sazetak prehrambenih okidaca' : 'Food Trigger Summary',
+    topTriggers: isHr ? 'Najcesci okidaci' : 'Most frequent triggers',
+    triggerLog: isHr ? 'Dnevnik okidaca (s biljeskama)' : 'Trigger log (with notes)',
+    breathSummary: isHr ? 'Sazetak izdisajnih testova' : 'Breath Test Summary',
+    latestBreath: isHr ? 'Zadnji izdisajni test' : 'Latest breath test',
     noBreathTests: isHr ? 'Nema spremljenih breath testova.' : 'No saved breath tests.',
     breathHistory: isHr ? 'Povijest breath testova' : 'Breath test history',
     medicalNotice: isHr
@@ -156,7 +156,7 @@ export default function DoctorReport() {
       : 'Note: this is an educational summary of user-entered data, not a diagnosis.',
     noData: isHr ? 'Nema podataka' : 'No data',
     date: isHr ? 'Datum' : 'Date',
-    overall: isHr ? 'Overall' : 'Overall',
+    overall: isHr ? 'Ukupno stanje crijeva' : 'Overall',
     pain: isHr ? 'Bol' : 'Pain',
     bloating: isHr ? 'Nadutost' : 'Bloating',
     stress: isHr ? 'Stres' : 'Stress',
@@ -166,6 +166,19 @@ export default function DoctorReport() {
     h2Rise: isHr ? 'H2 porast' : 'H2 rise',
     ch4Peak: isHr ? 'CH4 vrh' : 'CH4 peak',
     interpretation: isHr ? 'Interpretacija' : 'Interpretation',
+  };
+
+  const primarySymptomLabelsHr: Record<string, string> = {
+    Bloating: 'Nadutost',
+    'Abdominal Pain': 'Bol u trbuhu',
+    Gas: 'Plinovi',
+    'Brain Fog': 'Mentalna magla',
+  };
+
+  const stoolPatternLabelsHr: Record<string, string> = {
+    Constipation: 'Zatvor',
+    Diarrhea: 'Proljev',
+    'Mixed/Normal': 'Mijesano/normalno',
   };
 
   const [onboarding, setOnboarding] = useState<OnboardingData>({});
@@ -232,6 +245,14 @@ export default function DoctorReport() {
     energy: isHr ? 'Energija' : 'Energy',
     stool: isHr ? 'Stolica' : 'Stool',
   };
+
+  const primarySymptomValue = onboarding?.primarySymptom
+    ? (isHr ? (primarySymptomLabelsHr[onboarding.primarySymptom] ?? onboarding.primarySymptom) : onboarding.primarySymptom)
+    : copy.notProvided;
+
+  const stoolPatternValue = onboarding?.stoolPattern
+    ? (isHr ? (stoolPatternLabelsHr[onboarding.stoolPattern] ?? onboarding.stoolPattern) : onboarding.stoolPattern)
+    : copy.notProvided;
 
   const symptomAverages = useMemo(() => {
     return SYMPTOM_FIELDS
@@ -337,8 +358,9 @@ export default function DoctorReport() {
     }).join('');
 
     const suspectedTriggersText = suspectedTriggerList.length > 0 ? suspectedTriggerList.join(', ') : copy.notProvided;
+    const topTriggerNotePrefix = isHr ? 'biljeska' : 'note';
     const topTriggerText = topTriggers.length > 0
-      ? topTriggers.map((item) => `${item.label} (${item.count}x${item.lastNote ? `; note: ${item.lastNote}` : ''})`).join(', ')
+      ? topTriggers.map((item) => `${item.label} (${item.count}x${item.lastNote ? `; ${topTriggerNotePrefix}: ${item.lastNote}` : ''})`).join(', ')
       : copy.noData;
 
     const html = `
@@ -372,9 +394,9 @@ export default function DoctorReport() {
 
     <div class="card">
       <h2>${escapeHtml(copy.baseline)}</h2>
-      <p><strong>${escapeHtml(copy.primarySymptom)}:</strong> ${escapeHtml(onboarding?.primarySymptom || copy.notProvided)}</p>
+      <p><strong>${escapeHtml(copy.primarySymptom)}:</strong> ${escapeHtml(primarySymptomValue)}</p>
       <p><strong>${escapeHtml(copy.severity)}:</strong> ${onboarding?.severity ? `${onboarding.severity}/10` : escapeHtml(copy.notProvided)}</p>
-      <p><strong>${escapeHtml(copy.stoolPattern)}:</strong> ${escapeHtml(onboarding?.stoolPattern || copy.notProvided)}</p>
+      <p><strong>${escapeHtml(copy.stoolPattern)}:</strong> ${escapeHtml(stoolPatternValue)}</p>
       <p><strong>${escapeHtml(copy.suspectedTriggers)}:</strong> ${escapeHtml(suspectedTriggersText)}</p>
     </div>
 
@@ -563,9 +585,9 @@ export default function DoctorReport() {
               {copy.baseline}
             </h3>
             <div className="mt-3 text-sm space-y-1">
-              <p><strong>{copy.primarySymptom}:</strong> {onboarding?.primarySymptom || copy.notProvided}</p>
+              <p><strong>{copy.primarySymptom}:</strong> {primarySymptomValue}</p>
               <p><strong>{copy.severity}:</strong> {onboarding?.severity ? `${onboarding.severity}/10` : copy.notProvided}</p>
-              <p><strong>{copy.stoolPattern}:</strong> {onboarding?.stoolPattern || copy.notProvided}</p>
+              <p><strong>{copy.stoolPattern}:</strong> {stoolPatternValue}</p>
             </div>
             <div className="mt-3">
               <p className="text-sm font-medium">{copy.suspectedTriggers}</p>

@@ -17,6 +17,7 @@ import {
   X,
   Languages,
   ChevronDown,
+  ClipboardList,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -256,7 +257,7 @@ export default function Layout() {
           <NavItem icon={<Utensils />} label={copy.nav.foodHub} to="/food-hub" onPrefetch={routePrefetchers['/food-hub']} />
           <NavItem icon={<BookOpen />} label={copy.nav.education} to="/education" onPrefetch={routePrefetchers['/education']} />
           <NavItem icon={<Bot />} label={copy.nav.nihAssistant} to="/nih-evidence" onPrefetch={routePrefetchers['/nih-evidence']} />
-          <NavItem icon={<FileText />} label={copy.nav.doctorReport} to="/summary" onPrefetch={routePrefetchers['/summary']} />
+          <NavItem icon={<ClipboardList />} label={copy.nav.doctorReport} to="/summary" onPrefetch={routePrefetchers['/summary']} />
         </nav>
 
         <div className="p-4 mt-auto space-y-4">
