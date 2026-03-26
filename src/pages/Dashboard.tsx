@@ -21,6 +21,7 @@ import { getBreathTests, getSymptomEntries } from '../services/healthApi';
 import { SymptomDiaryEntry } from '../types/symptomDiary';
 import { getLocalDateKey } from '../utils/symptomDiaryStorage';
 import { analyzeBreathTest } from '../utils/breathInterpretation';
+import siboMannequin from '../../images/sibo-mannequin.png';
 
 type ChartRange = 7 | 30;
 
@@ -424,25 +425,13 @@ export default function Dashboard() {
           )}
         </div>
 
-        <div className="xl:col-span-4 bg-slate-900/40 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm h-full flex flex-col">
-          <h2 className="text-lg font-medium text-white mb-4">{copy.todayFocus}</h2>
-          <ul className="space-y-3 text-sm text-slate-300">
-            <li className="flex items-start gap-2">
-              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-400 shrink-0" />
-              {copy.focus1}
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-400 shrink-0" />
-              {copy.focus2}
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-400 shrink-0" />
-              {copy.focus3}
-            </li>
-          </ul>
-          <div className="mt-auto pt-5 rounded-xl border border-slate-800 bg-slate-950/50 p-4">
-            <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">{copy.focusNoteTitle}</p>
-            <p className="text-sm text-slate-300 leading-relaxed">{copy.focusNoteText}</p>
+        <div className="xl:col-span-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 p-4 sm:p-5 backdrop-blur-sm">
+          <div className="flex h-full min-h-[360px] items-center justify-center">
+            <img
+              src={siboMannequin}
+              alt="SIBO mannequin illustration"
+              className="max-h-[440px] w-full max-w-[360px] object-contain drop-shadow-[0_28px_42px_rgba(15,23,42,0.34)]"
+            />
           </div>
         </div>
       </div>
