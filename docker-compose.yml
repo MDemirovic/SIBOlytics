@@ -1,0 +1,49 @@
+services:
+  mongo:
+    image: mongo:8
+    container_name: sibolytics-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sibolytics-app
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      API_PORT: 3001
+      API_JSON_LIMIT: ${API_JSON_LIMIT:-12mb}
+      MONGODB_URI: mongodb://mongo:27017/sibolytics
+      MONGODB_DB_NAME: ${MONGODB_DB_NAME:-sibolytics}
+      LEGACY_DATABASE_URL: ${LEGACY_DATABASE_URL:-}
+      NIH_LLM_PROVIDER: ${NIH_LLM_PROVIDER:-groq}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      NIH_LLM_MODEL: ${NIH_LLM_MODEL:-gemini-2.0-flash}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      NIH_GROQ_MODEL: ${NIH_GROQ_MODEL:-llama-3.1-8b-instant}
+      NIH_TOP_K: ${NIH_TOP_K:-6}
+      NIH_MAX_CONTEXT_CHARS: ${NIH_MAX_CONTEXT_CHARS:-12000}
+      NIH_MAX_QPS_PER_USER: ${NIH_MAX_QPS_PER_USER:-1}
+      NIH_MAX_REQ_PER_HOUR: ${NIH_MAX_REQ_PER_HOUR:-30}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      BREATH_OCR_MODEL: ${BREATH_OCR_MODEL:-mistral-ocr-latest}
+      BREATH_OCR_TIMEOUT_MS: ${BREATH_OCR_TIMEOUT_MS:-20000}
+      BREATH_OCR_MAX_IMAGE_MB: ${BREATH_OCR_MAX_IMAGE_MB:-8}
+      BREATH_OCR_MAX_REQ_PER_HOUR: ${BREATH_OCR_MAX_REQ_PER_HOUR:-40}
+
+volumes:
+  mongo_data:
