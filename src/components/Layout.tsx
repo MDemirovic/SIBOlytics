@@ -136,7 +136,7 @@ function NavItem({
       to={to}
       onMouseEnter={onPrefetch}
       onFocus={onPrefetch}
-      className={({ isActive }) => `w-full flex items-center gap-2.5 px-2.5 py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-colors ${isActive
+      className={({ isActive }) => `w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-[15px] font-semibold transition-colors ${isActive
           ? 'bg-[#14203d] text-white'
           : 'text-[#8a94ab] hover:text-slate-200 hover:bg-[#111a30]'
         }`}
@@ -144,7 +144,7 @@ function NavItem({
       {({ isActive }) => (
         <>
           <span className={isActive ? 'text-[#5b9bff]' : ''}>
-            {React.cloneElement(icon as React.ReactElement, { className: 'w-4 h-4' })}
+            {React.cloneElement(icon as React.ReactElement, { className: 'w-[18px] h-[18px]' })}
           </span>
           {label}
         </>
@@ -217,7 +217,7 @@ export default function Layout() {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-[#0a1020] border-r border-[#172038] flex flex-col overflow-y-auto sidebar-no-scrollbar px-3.5 py-5 font-['Manrope',ui-sans-serif,system-ui,sans-serif] transform transition-transform duration-200 md:static md:z-auto md:w-[216px] md:flex-none md:max-w-none md:translate-x-0 ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-[#0a1020] border-r border-[#172038] flex flex-col overflow-y-auto sidebar-no-scrollbar px-4 py-6 font-['Manrope',ui-sans-serif,system-ui,sans-serif] transform transition-transform duration-200 md:static md:z-auto md:w-[264px] md:flex-none md:max-w-none md:translate-x-0 ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
       >
         <div className="md:hidden flex justify-end pb-2">
@@ -230,14 +230,14 @@ export default function Layout() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2.5 px-2 pb-6">
-          <div className="w-7 h-7 rounded-lg bg-[#1f6bff] flex items-center justify-center">
-            <Wind className="w-4 h-4 text-white" />
+        <div className="flex items-center gap-3 px-2 pb-7">
+          <div className="w-9 h-9 rounded-[10px] bg-[#1f6bff] flex items-center justify-center">
+            <Wind className="w-5 h-5 text-white" />
           </div>
-          <span className="text-[17px] font-extrabold tracking-[-.02em]">SIBOlytics</span>
+          <span className="text-xl font-extrabold tracking-[-.02em]">SIBOlytics</span>
         </div>
 
-        <nav className="flex flex-col gap-0.5">
+        <nav className="flex flex-col gap-1">
           <NavItem icon={<Home />} label={copy.nav.home} to="/home" onPrefetch={routePrefetchers['/home']} />
           <NavItem icon={<LayoutDashboard />} label={copy.nav.dashboard} to="/dashboard" onPrefetch={routePrefetchers['/dashboard']} />
           <NavItem icon={<FileText />} label={copy.nav.symptomLog} to="/symptom-diary" onPrefetch={routePrefetchers['/symptom-diary']} />
@@ -257,7 +257,7 @@ export default function Layout() {
               <button
                 type="button"
                 onClick={() => setIsLanguageMenuOpen((open) => !open)}
-                className="font-['JetBrains_Mono',ui-monospace,monospace] text-[11px] px-1.5 py-0.5 border border-[#1f2a45] rounded-[5px] text-[#6b7690] hover:text-slate-200 hover:border-[#2a4a8a] transition-colors"
+                className="font-['JetBrains_Mono',ui-monospace,monospace] text-xs px-2 py-1 border border-[#1f2a45] rounded-md text-[#6b7690] hover:text-slate-200 hover:border-[#2a4a8a] transition-colors"
                 aria-haspopup="menu"
                 aria-expanded={isLanguageMenuOpen ? 'true' : 'false'}
                 aria-controls="language-menu"
@@ -298,7 +298,7 @@ export default function Layout() {
               )}
             </div>
           </div>
-          <p className="m-0 p-2.5 border-t border-[#172038] text-[11px] leading-[1.45] text-[#56617a]" title={copy.misc.disclaimerText}>
+          <p className="m-0 p-3 border-t border-[#172038] text-xs leading-normal text-[#56617a]" title={copy.misc.disclaimerText}>
             {copy.misc.disclaimerShort}
           </p>
         </div>
