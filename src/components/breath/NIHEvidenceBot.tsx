@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Bot, Send, ShieldAlert, ExternalLink, Loader2 } from 'lucide-react';
 import { ApiRequestError, askNihBot, NihChatCitation } from '../../services/healthApi';
 import { useLanguage } from '../../context/LanguageContext';
@@ -57,7 +58,9 @@ export default function NIHEvidenceBot() {
   ), [isHr]);
 
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
+  const location = useLocation();
+  const prefill = (location.state as { prefill?: unknown } | null)?.prefill;
+  const [input, setInput] = useState(typeof prefill === 'string' ? prefill : '');
   const [isSending, setIsSending] = useState(false);
   const [apiError, setApiError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);

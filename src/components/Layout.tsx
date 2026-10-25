@@ -1,26 +1,22 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
-import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   Activity,
   FileText,
-  Table,
+  LayoutDashboard,
   Utensils,
   BookOpen,
   Settings,
-  AlertCircle,
   Wind,
-  LogOut,
-  User as UserIcon,
   Bot,
   Home,
   Menu,
   X,
-  Languages,
-  ChevronDown,
   ClipboardList,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import UserMenu from './UserMenu';
 
 const routePrefetchers: Record<string, () => void> = {
   '/home': () => { void import('../pages/Home'); },
@@ -71,6 +67,7 @@ const languageCopy = {
       guest: 'Guest',
       medicalDisclaimer: 'Medical Disclaimer',
       disclaimerText: 'SIBOlytics is an educational tool. Always consult your gastroenterologist before changing your treatment.',
+      disclaimerShort: 'Educational tool. Not medical advice.',
       language: 'Language',
       english: 'English',
       croatian: 'Croatian',
@@ -113,6 +110,7 @@ const languageCopy = {
       guest: 'Gost',
       medicalDisclaimer: 'Medicinsko upozorenje',
       disclaimerText: 'SIBOlytics je edukativni alat. Uvijek se posavjetujte s gastroenterologom prije promjene terapije.',
+      disclaimerShort: 'Edukativni alat. Nije medicinski savjet.',
       language: 'Jezik',
       english: 'Engleski',
       croatian: 'Hrvatski',
@@ -138,15 +136,15 @@ function NavItem({
       to={to}
       onMouseEnter={onPrefetch}
       onFocus={onPrefetch}
-      className={({ isActive }) => `w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive
-          ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
-          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+      className={({ isActive }) => `w-full flex items-center gap-2.5 px-2.5 py-[9px] rounded-[9px] text-[13.5px] font-semibold transition-colors ${isActive
+          ? 'bg-[#14203d] text-white'
+          : 'text-[#8a94ab] hover:text-slate-200 hover:bg-[#111a30]'
         }`}
     >
       {({ isActive }) => (
         <>
-          <span className={isActive ? 'text-white' : 'text-slate-500'}>
-            {React.cloneElement(icon as React.ReactElement, { className: 'w-5 h-5' })}
+          <span className={isActive ? 'text-[#5b9bff]' : ''}>
+            {React.cloneElement(icon as React.ReactElement, { className: 'w-4 h-4' })}
           </span>
           {label}
         </>
@@ -156,22 +154,17 @@ function NavItem({
 }
 
 export default function Layout() {
-  const { user, logout } = useAuth();
   const { language, setLanguage } = useLanguage();
-  const navigate = useNavigate();
   const location = useLocation();
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const languageDropdownRef = useRef<HTMLDivElement>(null);
   const copy = languageCopy[language];
+  const { user } = useAuth();
+  const isHome = location.pathname === '/home';
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-      }
       if (languageDropdownRef.current && !languageDropdownRef.current.contains(event.target as Node)) {
         setIsLanguageMenuOpen(false);
       }
@@ -184,11 +177,6 @@ export default function Layout() {
     setIsMobileSidebarOpen(false);
     setIsLanguageMenuOpen(false);
   }, [location.pathname]);
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/');
-  };
 
   const getHeaderContent = () => {
     switch (location.pathname) {
@@ -219,7 +207,7 @@ export default function Layout() {
   const headerContent = getHeaderContent();
 
   return (
-    <div className="min-h-screen md:h-screen bg-slate-950 text-slate-50 font-sans flex flex-col md:flex-row overflow-x-hidden md:overflow-hidden">
+    <div className="min-h-screen md:h-screen bg-[#060a16] text-slate-50 font-sans flex flex-col md:flex-row overflow-x-hidden md:overflow-hidden">
       {isMobileSidebarOpen && (
         <button
           className="md:hidden fixed inset-0 z-40 bg-slate-950/60"
@@ -229,10 +217,10 @@ export default function Layout() {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-slate-900/95 backdrop-blur-xl border-r border-slate-800 flex flex-col overflow-y-auto sidebar-no-scrollbar transform transition-transform duration-200 md:static md:z-auto md:w-64 md:max-w-none md:bg-slate-900/50 md:border-b-0 md:translate-x-0 ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-[#0a1020] border-r border-[#172038] flex flex-col overflow-y-auto sidebar-no-scrollbar px-3.5 py-5 font-['Manrope',ui-sans-serif,system-ui,sans-serif] transform transition-transform duration-200 md:static md:z-auto md:w-[216px] md:flex-none md:max-w-none md:translate-x-0 ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
       >
-        <div className="p-4 md:hidden flex justify-end">
+        <div className="md:hidden flex justify-end pb-2">
           <button
             onClick={() => setIsMobileSidebarOpen(false)}
             className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors"
@@ -242,16 +230,16 @@ export default function Layout() {
           </button>
         </div>
 
-        <div className="p-6 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-            <Wind className="w-5 h-5 text-white" />
+        <div className="flex items-center gap-2.5 px-2 pb-6">
+          <div className="w-7 h-7 rounded-lg bg-[#1f6bff] flex items-center justify-center">
+            <Wind className="w-4 h-4 text-white" />
           </div>
-          <span className="text-xl font-semibold tracking-tight">SIBOlytics</span>
+          <span className="text-[17px] font-extrabold tracking-[-.02em]">SIBOlytics</span>
         </div>
 
-        <nav className="flex-1 px-4 py-4 space-y-1">
+        <nav className="flex flex-col gap-0.5">
           <NavItem icon={<Home />} label={copy.nav.home} to="/home" onPrefetch={routePrefetchers['/home']} />
-          <NavItem icon={<Table />} label={copy.nav.dashboard} to="/dashboard" onPrefetch={routePrefetchers['/dashboard']} />
+          <NavItem icon={<LayoutDashboard />} label={copy.nav.dashboard} to="/dashboard" onPrefetch={routePrefetchers['/dashboard']} />
           <NavItem icon={<FileText />} label={copy.nav.symptomLog} to="/symptom-diary" onPrefetch={routePrefetchers['/symptom-diary']} />
           <NavItem icon={<Activity />} label={copy.nav.breathTests} to="/breath-tests" onPrefetch={routePrefetchers['/breath-tests']} />
           <NavItem icon={<Utensils />} label={copy.nav.foodHub} to="/food-hub" onPrefetch={routePrefetchers['/food-hub']} />
@@ -260,47 +248,29 @@ export default function Layout() {
           <NavItem icon={<ClipboardList />} label={copy.nav.doctorReport} to="/summary" onPrefetch={routePrefetchers['/summary']} />
         </nav>
 
-        <div className="p-4 mt-auto space-y-4">
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
-            <div className="flex items-center gap-2 text-blue-400 mb-2">
-              <AlertCircle className="w-4 h-4" />
-              <span className="text-xs font-medium uppercase tracking-wider">{copy.misc.medicalDisclaimer}</span>
+        <div className="mt-auto pt-6 flex flex-col gap-2.5">
+          <div className="flex items-center gap-1">
+            <div className="flex-1 min-w-0">
+              <NavItem icon={<Settings />} label={copy.nav.settings} to="/settings" onPrefetch={routePrefetchers['/settings']} />
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              {copy.misc.disclaimerText}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
-            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400 flex items-center gap-2 mb-2">
-              <Languages className="w-3.5 h-3.5" />
-              {copy.misc.language}
-            </label>
             <div className="relative" ref={languageDropdownRef}>
               <button
                 type="button"
                 onClick={() => setIsLanguageMenuOpen((open) => !open)}
-                className="w-full flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950/70 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-slate-900 transition-colors"
+                className="font-['JetBrains_Mono',ui-monospace,monospace] text-[11px] px-1.5 py-0.5 border border-[#1f2a45] rounded-[5px] text-[#6b7690] hover:text-slate-200 hover:border-[#2a4a8a] transition-colors"
                 aria-haspopup="menu"
                 aria-expanded={isLanguageMenuOpen ? 'true' : 'false'}
                 aria-controls="language-menu"
+                aria-label={copy.misc.language}
               >
-                <span className="flex items-center gap-2 min-w-0">
-                  <span className="text-[11px] font-semibold text-blue-300">
-                    {language === 'en' ? 'EN' : 'HR'}
-                  </span>
-                  <span className="truncate text-slate-400">
-                    {language === 'en' ? copy.misc.english : copy.misc.croatian}
-                  </span>
-                </span>
-                <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${isLanguageMenuOpen ? 'rotate-180' : ''}`} />
+                {language === 'en' ? 'EN' : 'HR'}
               </button>
 
               {isLanguageMenuOpen && (
                 <div
                   id="language-menu"
                   role="menu"
-                  className="absolute inset-x-0 top-full mt-1 z-20 rounded-lg border border-slate-800 bg-slate-950 p-1"
+                  className="absolute right-0 bottom-full mb-1 z-20 w-32 rounded-lg border border-[#1f2a45] bg-[#070c1a] p-1"
                 >
                   <button
                     type="button"
@@ -308,7 +278,7 @@ export default function Layout() {
                       setLanguage('en');
                       setIsLanguageMenuOpen(false);
                     }}
-                    className={`w-full text-left rounded-md px-2 py-1.5 text-xs transition-colors ${language === 'en' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'
+                    className={`w-full text-left rounded-md px-2 py-1.5 text-xs transition-colors ${language === 'en' ? 'bg-[#1f6bff] text-white' : 'text-slate-300 hover:bg-[#121a33]'
                       }`}
                   >
                     {copy.misc.english}
@@ -319,7 +289,7 @@ export default function Layout() {
                       setLanguage('hr');
                       setIsLanguageMenuOpen(false);
                     }}
-                    className={`w-full text-left rounded-md px-2 py-1.5 text-xs transition-colors ${language === 'hr' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'
+                    className={`w-full text-left rounded-md px-2 py-1.5 text-xs transition-colors ${language === 'hr' ? 'bg-[#1f6bff] text-white' : 'text-slate-300 hover:bg-[#121a33]'
                       }`}
                   >
                     {copy.misc.croatian}
@@ -328,15 +298,14 @@ export default function Layout() {
               )}
             </div>
           </div>
-
-          <nav className="space-y-1">
-            <NavItem icon={<Settings />} label={copy.nav.settings} to="/settings" onPrefetch={routePrefetchers['/settings']} />
-          </nav>
+          <p className="m-0 p-2.5 border-t border-[#172038] text-[11px] leading-[1.45] text-[#56617a]" title={copy.misc.disclaimerText}>
+            {copy.misc.disclaimerShort}
+          </p>
         </div>
       </aside>
 
       <main className="flex-1 flex flex-col h-auto md:h-screen overflow-visible md:overflow-y-auto relative">
-        <header className="sticky top-0 z-30 isolate bg-slate-950/90 supports-backdrop-filter:bg-slate-950/70 backdrop-blur-xl border-b border-slate-800/60 px-4 md:px-8 py-4 flex items-center justify-between shadow-lg shadow-slate-950/40">
+        <header className={`sticky top-0 z-30 isolate bg-[#060a16]/90 supports-backdrop-filter:bg-[#060a16]/70 backdrop-blur-xl border-b border-[#172038] px-4 md:px-8 py-4 flex items-center justify-between shadow-lg shadow-slate-950/40 ${isHome ? 'md:hidden' : ''}`}>
           <div className="flex items-start gap-3">
             <button
               onClick={() => setIsMobileSidebarOpen(true)}
@@ -351,50 +320,10 @@ export default function Layout() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 relative" ref={dropdownRef}>
-            <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex items-center gap-3 hover:bg-slate-900 p-1.5 rounded-full transition-colors"
-            >
-              <span className="text-sm font-medium hidden sm:block">{user?.name}</span>
-              <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
-                {user?.name?.charAt(0).toUpperCase() || 'U'}
-              </div>
-            </button>
-
-            {isDropdownOpen && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-xl py-2 z-50">
-                <button
-                  onClick={() => {
-                    setIsDropdownOpen(false);
-                    navigate('/settings');
-                  }}
-                  className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
-                >
-                  <UserIcon className="w-4 h-4" /> {copy.misc.profile}
-                </button>
-                <button
-                  onClick={() => {
-                    setIsDropdownOpen(false);
-                    navigate('/settings');
-                  }}
-                  className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
-                >
-                  <Settings className="w-4 h-4" /> {copy.nav.settings}
-                </button>
-                <div className="h-px bg-slate-800 my-2"></div>
-                <button
-                  onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-slate-800 hover:text-red-300 flex items-center gap-2"
-                >
-                  <LogOut className="w-4 h-4" /> {copy.misc.logout}
-                </button>
-              </div>
-            )}
-          </div>
+          <UserMenu showName />
         </header>
 
-        <div className="p-8 max-w-7xl mx-auto w-full">
+        <div className={`max-w-7xl mx-auto w-full ${isHome ? 'flex flex-1 flex-col p-6 md:px-16 md:pt-[52px] md:pb-10' : 'p-8'}`}>
           <Outlet />
         </div>
       </main>
